@@ -27,3 +27,6 @@ go.work.sum
 
 # Frontend
 homebar/web/node_modules
+
+# IDE 
+homebar/.idea

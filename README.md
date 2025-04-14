@@ -120,3 +120,49 @@ The system includes the following main domain models:
 - Integrate recommendation systems
 - Develop mobile management applications for merchants
 - Add multi-language support
+
+
+## Project Setup
+
+### Prerequisites
+
+- Go 1.20+
+- Node.js 18+
+
+### Backend Setup
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/yourusername/homebar.git
+```
+
+2. Install dependencies
+
+```bash
+cd homebar
+go mod download
+go mod tidy
+```
+
+3. Run the server
+
+```bash
+go run cmd/server/main.go
+```
+
+### Frontend Setup
+
+1. Install dependencies
+
+```bash
+cd homebar/web
+npm install
+```
+
+2. Start the development server
+
+```bash
+npm start
+```
+

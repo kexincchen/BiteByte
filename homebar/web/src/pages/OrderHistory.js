@@ -1,10 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Link } from 'react-router-dom';
+import { orderAPI } from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
 
 const OrderHistory = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const { currentUser } = useContext(AuthContext);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await orderAPI.getOrders();
+        setOrders(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setError('Failed to load your orders');
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [currentUser]);
+
+  if (loading) return <div>Loading orders...</div>;
+  if (error) return <div className="error">{error}</div>;
+  if (!currentUser) return <div>Please login to view your orders</div>;
+  if (orders.length === 0) return <div>You have no orders yet</div>;
+
   return (
-    <div>
-      <h1>Order History Page</h1>
-      <p>This is a placeholder for the order history page.</p>
+    <div className="order-history-page">
+      <h1>Your Orders</h1>
+      
+      <div className="orders-list">
+        {orders.map(order => (
+          <div key={order.id} className="order-card">
+            <div className="order-header">
+              <div className="order-id">
+                <h3>Order #{order.id}</h3>
+                <span className={`order-status status-${order.status}`}>
+                  {order.status}
+                </span>
+              </div>
+              <div className="order-date">
+                {new Date(order.created_at).toLocaleDateString()}
+              </div>
+            </div>
+            
+            <div className="order-details">
+              <div className="order-total">
+                Total: ${order.total_amount.toFixed(2)}
+              </div>
+              
+              <Link to={`/orders/${order.id}`} className="view-order-button">
+                View Details
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

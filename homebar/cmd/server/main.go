@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -29,31 +32,37 @@ func main() {
 	// Setup router
 	router := gin.Default()
 
-	// Define routes
-	// api := router.Group("/api")
-	// {
-	//     auth := api.Group("/auth")
-	//     {
-	//         auth.POST("/register", userHandler.Register)
-	//         auth.POST("/login", userHandler.Login)
-	//     }
-	//
-	//     users := api.Group("/users")
-	//     // users.Use(middleware.Auth()) // Add authentication middleware
-	//     {
-	//         users.GET("/me", userHandler.GetProfile)
-	//     }
-	//
-	//     products := api.Group("/products")
-	//     {
-	//         products.GET("", productHandler.ListProducts)
-	//         products.GET("/:id", productHandler.GetProduct)
-	//     }
-	//
-	//     // More routes...
-	// }
+	// Enable CORS middleware
+	router.Use(corsMiddleware())
 
-	// For now, just add a simple health check endpoint
+	// Define routes
+	apiRoutes := router.Group("/api")
+	{
+		// Auth routes
+		authRoutes := apiRoutes.Group("/auth")
+		{
+			// For now, we'll use stub handlers until we implement the full functionality
+			authRoutes.POST("/register", stubRegisterHandler)
+			authRoutes.POST("/login", stubLoginHandler)
+		}
+
+		// Product routes
+		productRoutes := apiRoutes.Group("/products")
+		{
+			productRoutes.GET("", stubGetProductsHandler)
+			productRoutes.GET("/:id", stubGetProductHandler)
+		}
+
+		// Order routes
+		orderRoutes := apiRoutes.Group("/orders")
+		{
+			orderRoutes.POST("", stubCreateOrderHandler)
+			orderRoutes.GET("", stubGetOrdersHandler)
+			orderRoutes.GET("/:id", stubGetOrderHandler)
+		}
+	}
+
+	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
@@ -64,4 +73,243 @@ func main() {
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// CORS middleware to allow frontend to access the API
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// Stub handlers for testing
+func stubRegisterHandler(c *gin.Context) {
+	var req struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Role     string `json:"role"`
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// Return a mock user
+	c.JSON(201, gin.H{
+		"id":       1,
+		"username": req.Username,
+		"email":    req.Email,
+		"role":     req.Role,
+	})
+}
+
+func stubLoginHandler(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// Return a mock user and token
+	c.JSON(200, gin.H{
+		"user": gin.H{
+			"id":       1,
+			"username": "demoUser",
+			"email":    req.Email,
+			"role":     "customer",
+		},
+		"token": "mock-jwt-token-for-testing",
+	})
+}
+
+func stubGetProductsHandler(c *gin.Context) {
+	// Return mock products
+	c.JSON(200, []gin.H{
+		{
+			"id":           1,
+			"merchant_id":  1,
+			"name":         "Mojito",
+			"description":  "Classic cocktail with rum, mint, and lime",
+			"price":        8.99,
+			"category":     "Cocktails",
+			"image_url":    "https://via.placeholder.com/300x200.png?text=Mojito",
+			"is_available": true,
+		},
+		{
+			"id":           2,
+			"merchant_id":  1,
+			"name":         "Old Fashioned",
+			"description":  "Whiskey cocktail with sugar and bitters",
+			"price":        9.99,
+			"category":     "Cocktails",
+			"image_url":    "https://via.placeholder.com/300x200.png?text=Old+Fashioned",
+			"is_available": true,
+		},
+		{
+			"id":           3,
+			"merchant_id":  2,
+			"name":         "Margarita",
+			"description":  "Tequila cocktail with lime and salt",
+			"price":        7.99,
+			"category":     "Cocktails",
+			"image_url":    "https://via.placeholder.com/300x200.png?text=Margarita",
+			"is_available": true,
+		},
+	})
+}
+
+func stubGetProductHandler(c *gin.Context) {
+	id := c.Param("id")
+
+	// Return a mock product based on ID
+	c.JSON(200, gin.H{
+		"id":           id,
+		"merchant_id":  1,
+		"name":         "Mojito",
+		"description":  "Classic cocktail with rum, mint, and lime",
+		"price":        8.99,
+		"category":     "Cocktails",
+		"image_url":    "https://via.placeholder.com/300x200.png?text=Mojito",
+		"is_available": true,
+		"ingredients": []gin.H{
+			{
+				"id":       1,
+				"name":     "White Rum",
+				"quantity": 50, // in ml
+				"unit":     "ml",
+			},
+			{
+				"id":       2,
+				"name":     "Fresh Mint",
+				"quantity": 10, // leaves
+				"unit":     "leaves",
+			},
+			{
+				"id":       3,
+				"name":     "Lime Juice",
+				"quantity": 25, // in ml
+				"unit":     "ml",
+			},
+			{
+				"id":       4,
+				"name":     "Sugar Syrup",
+				"quantity": 15, // in ml
+				"unit":     "ml",
+			},
+		},
+	})
+}
+
+func stubCreateOrderHandler(c *gin.Context) {
+	var req struct {
+		CustomerID uint `json:"customer_id"`
+		MerchantID uint `json:"merchant_id"`
+		Items      []struct {
+			ProductID uint `json:"product_id"`
+			Quantity  int  `json:"quantity"`
+		} `json:"items"`
+		Notes string `json:"notes"`
+	}
+
+	// Print the raw request body for debugging
+	body, _ := ioutil.ReadAll(c.Request.Body)
+	c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	fmt.Println("Request body:", string(body))
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.CustomerID == 0 || req.MerchantID == 0 || len(req.Items) == 0 {
+		c.JSON(400, gin.H{
+			"error": "Missing required fields",
+		})
+		return
+	}
+
+	// Return a mock order
+	c.JSON(201, gin.H{
+		"id":           1,
+		"customer_id":  req.CustomerID,
+		"merchant_id":  req.MerchantID,
+		"total_amount": 26.97,
+		"status":       "pending",
+		"notes":        req.Notes,
+		"created_at":   "2023-09-20T15:04:05Z",
+	})
+}
+
+func stubGetOrdersHandler(c *gin.Context) {
+	// Return mock orders
+	c.JSON(200, []gin.H{
+		{
+			"id":           1,
+			"customer_id":  1,
+			"merchant_id":  1,
+			"total_amount": 26.97,
+			"status":       "pending",
+			"notes":        "No ice in mojito",
+			"created_at":   "2023-09-20T15:04:05Z",
+		},
+		{
+			"id":           2,
+			"customer_id":  1,
+			"merchant_id":  2,
+			"total_amount": 15.98,
+			"status":       "delivered",
+			"notes":        "",
+			"created_at":   "2023-09-19T12:34:56Z",
+		},
+	})
+}
+
+func stubGetOrderHandler(c *gin.Context) {
+	id := c.Param("id")
+
+	// Return a mock order based on ID
+	c.JSON(200, gin.H{
+		"id":           id,
+		"customer_id":  1,
+		"merchant_id":  1,
+		"total_amount": 26.97,
+		"status":       "pending",
+		"notes":        "No ice in mojito",
+		"created_at":   "2023-09-20T15:04:05Z",
+		"items": []gin.H{
+			{
+				"id":           1,
+				"product_id":   1,
+				"product_name": "Mojito",
+				"quantity":     2,
+				"price":        8.99,
+			},
+			{
+				"id":           2,
+				"product_id":   2,
+				"product_name": "Old Fashioned",
+				"quantity":     1,
+				"price":        9.99,
+			},
+		},
+	})
 }

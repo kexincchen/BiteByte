@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { productAPI } from '../services/api';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -12,49 +12,19 @@ const Products = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // In a real app, this would be a real API call
-        // const response = await axios.get('/api/products');
+        const response = await productAPI.getProducts();
+        const fetchedProducts = response.data;
         
-        // For demo, simulating API response
-        const mockProducts = [
-          {
-            id: 1,
-            name: 'Mojito',
-            description: 'Classic cocktail with rum, mint, and lime',
-            price: 8.99,
-            category: 'Cocktails',
-            imageUrl: 'https://example.com/mojito.jpg',
-            isAvailable: true
-          },
-          {
-            id: 2,
-            name: 'Old Fashioned',
-            description: 'Whiskey cocktail with sugar and bitters',
-            price: 9.99,
-            category: 'Cocktails',
-            imageUrl: 'https://example.com/old-fashioned.jpg',
-            isAvailable: true
-          },
-          {
-            id: 3,
-            name: 'Margarita',
-            description: 'Tequila cocktail with lime and salt',
-            price: 7.99,
-            category: 'Cocktails',
-            imageUrl: 'https://example.com/margarita.jpg',
-            isAvailable: true
-          }
-        ];
-        
-        setProducts(mockProducts);
+        setProducts(fetchedProducts);
         
         // Extract unique categories
-        const uniqueCategories = [...new Set(mockProducts.map(p => p.category))];
+        const uniqueCategories = [...new Set(fetchedProducts.map(p => p.category))];
         setCategories(uniqueCategories);
         
         setLoading(false);
       } catch (error) {
-        setError('Failed to fetch products');
+        console.error('Error fetching products:', error);
+        setError('Failed to fetch products. Please try again later.');
         setLoading(false);
       }
     };
@@ -95,7 +65,7 @@ const Products = () => {
         {filteredProducts.map(product => (
           <div key={product.id} className="product-card">
             <div className="product-image">
-              <img src={product.imageUrl} alt={product.name} />
+              <img src={product.image_url} alt={product.name} />
             </div>
             <div className="product-details">
               <h3>{product.name}</h3>

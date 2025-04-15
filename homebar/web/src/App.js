@@ -11,6 +11,7 @@ import Checkout from './pages/Checkout';
 import OrderHistory from './pages/OrderHistory';
 import OrderDetail from './pages/OrderDetail';
 import Profile from './pages/Profile';
+import MerchantProfile from './pages/MerchantProfile';
 import MerchantDashboard from './pages/merchant/Dashboard';
 import MerchantProducts from './pages/merchant/Products';
 import MerchantOrders from './pages/merchant/Orders';
@@ -38,6 +39,9 @@ function App() {
                 <Route path="/orders" element={<OrderHistory />} />
                 <Route path="/orders/:id" element={<OrderDetail />} />
                 <Route path="/profile" element={<Profile />} />
+                
+                {/* New route for merchant profiles */}
+                <Route path="/:username" element={<MerchantProfile />} />
                 
                 {/* Merchant Routes */}
                 <Route path="/merchant" element={<MerchantDashboard />} />

@@ -51,6 +51,7 @@ func main() {
 		{
 			productRoutes.GET("", stubGetProductsHandler)
 			productRoutes.GET("/:id", stubGetProductHandler)
+			productRoutes.GET("/merchant/:id", stubGetProductsByMerchantHandler)
 		}
 
 		// Order routes
@@ -59,6 +60,14 @@ func main() {
 			orderRoutes.POST("", stubCreateOrderHandler)
 			orderRoutes.GET("", stubGetOrdersHandler)
 			orderRoutes.GET("/:id", stubGetOrderHandler)
+		}
+
+		// Merchant routes
+		merchantRoutes := apiRoutes.Group("/merchants")
+		{
+			merchantRoutes.GET("", stubGetMerchantsHandler)
+			merchantRoutes.GET("/:id", stubGetMerchantHandler)
+			merchantRoutes.GET("/username/:username", stubGetMerchantByUsernameHandler)
 		}
 	}
 
@@ -131,7 +140,7 @@ func stubLoginHandler(c *gin.Context) {
 			"id":       1,
 			"username": "demoUser",
 			"email":    req.Email,
-			"role":     "customer",
+			"role":     "merchant",
 		},
 		"token": "mock-jwt-token-for-testing",
 	})
@@ -310,6 +319,93 @@ func stubGetOrderHandler(c *gin.Context) {
 				"quantity":     1,
 				"price":        9.99,
 			},
+		},
+	})
+}
+
+func stubGetMerchantsHandler(c *gin.Context) {
+	// Return a list of mock merchants
+	c.JSON(200, []gin.H{
+		{
+			"id": 1,
+			"user_id": 2,
+			"business_name": "Cocktail Haven",
+			"description": "Specializing in premium cocktails with a modern twist",
+			"address": "123 Main St, City",
+			"phone": "555-123-4567",
+			"is_verified": true,
+			"username": "cocktailhaven",
+		},
+		{
+			"id": 2,
+			"user_id": 3,
+			"business_name": "Tropical Tastes",
+			"description": "Exotic beach-inspired drinks and cocktails",
+			"address": "456 Ocean Ave, Beach City",
+			"phone": "555-987-6543",
+			"is_verified": true,
+			"username": "tropicaltastes",
+		},
+	})
+}
+
+func stubGetMerchantHandler(c *gin.Context) {
+	id := c.Param("id")
+	
+	// Return a mock merchant based on ID
+	c.JSON(200, gin.H{
+		"id": id,
+		"user_id": 2,
+		"business_name": "Cocktail Haven",
+		"description": "Specializing in premium cocktails with a modern twist",
+		"address": "123 Main St, City",
+		"phone": "555-123-4567",
+		"is_verified": true,
+		"username": "cocktailhaven",
+	})
+}
+
+func stubGetMerchantByUsernameHandler(c *gin.Context) {
+	username := c.Param("username")
+	
+	// In a real app, we would search for the merchant by username
+	// For demo purposes, just return a mock merchant with the given username
+	c.JSON(200, gin.H{
+		"id": 1,
+		"user_id": 2,
+		"business_name": "Cocktail Haven",
+		"description": "Specializing in premium cocktails with a modern twist",
+		"address": "123 Main St, City",
+		"phone": "555-123-4567",
+		"is_verified": true,
+		"username": username,
+	})
+}
+
+func stubGetProductsByMerchantHandler(c *gin.Context) {
+	merchantID := c.Param("id")
+	
+	// Return mock products for the given merchant ID
+	c.JSON(200, []gin.H{
+		{
+			"id": 1,
+			"merchant_id": merchantID,
+			"name": "Mojito",
+			"description": "Classic cocktail with rum, mint, and lime",
+			"price": 8.99,
+			"category": "Cocktails",
+			"image_url": "https://via.placeholder.com/300x200.png?text=Mojito",
+			"is_available": true,
+		},
+		{
+			"id": 2,
+			"merchant_id": merchantID,
+			"name": "Old Fashioned",
+			"description": "Whiskey cocktail with sugar and bitters",
+			"price": 9.99,
+			"category": "Cocktails",
+			"image_url": "https://via.placeholder.com/300x200.png?text=Old+Fashioned",
+			"is_available": true,
 		},
 	})
 }

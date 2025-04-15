@@ -40,18 +40,6 @@ const Products = () => {
     fetchProducts();
   }, [currentUser]);
 
-  const handleDelete = async (productId) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        await productAPI.deleteProduct(productId);
-        setProducts(products.filter(p => p.id !== productId));
-      } catch (error) {
-        console.error('Error deleting product:', error);
-        alert('Failed to delete product. Please try again.');
-      }
-    }
-  };
-
   const handleToggleAvailability = async (product) => {
     try {
       const updatedProduct = { ...product, is_available: !product.is_available };
@@ -153,12 +141,6 @@ const Products = () => {
                       onClick={() => navigate(`/merchant/products/edit/${product.id}`)}
                     >
                       Edit
-                    </button>
-                    <button 
-                      className="delete-button"
-                      onClick={() => handleDelete(product.id)}
-                    >
-                      Delete
                     </button>
                   </td>
                 </tr>

@@ -54,6 +54,18 @@ const ProductForm = ({ isEditing = false }) => {
     }
   }, [isEditing, id]);
 
+  const handleDelete = async (productId) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      try {
+        await productAPI.deleteProduct(productId);
+        navigate('/merchant/products');
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        alert('Failed to delete product. Please try again.');
+      }
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -193,8 +205,14 @@ const ProductForm = ({ isEditing = false }) => {
           <button type="button" onClick={() => navigate('/merchant/products')} className="cancel-button">
             Cancel
           </button>
+          <button 
+            className="delete-button"
+            onClick={() => handleDelete(id)}
+          >
+            Delete
+          </button>
           <button type="submit" disabled={submitting} className="submit-button">
-            {submitting ? 'Saving...' : isEditing ? 'Update Product' : 'Add Product'}
+            {submitting ? "Saving..." : isEditing ? "Update Product" : "Add Product"}
           </button>
         </div>
       </form>

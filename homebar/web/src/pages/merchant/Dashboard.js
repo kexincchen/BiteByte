@@ -104,7 +104,7 @@ const Dashboard = () => {
                   </td>
                   <td>${order.total_amount.toFixed(2)}</td>
                   <td>
-                    <Link to={`/merchant/orders/${order.id}`}>View</Link>
+                    <Link to={`/merchant/orders/${order.id}`}>Edit</Link>
                   </td>
                 </tr>
               ))}

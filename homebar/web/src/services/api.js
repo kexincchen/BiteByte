@@ -52,6 +52,12 @@ export const productAPI = {
   deleteProduct: (id) => {
     return apiClient.delete(`/products/${id}`);
   },
+  getMerchantByUsername: (username) => {
+    return apiClient.get(`/merchants/username/${username}`);
+  },
+  getProductsByMerchant: (merchantId) => {
+    return apiClient.get(`/products/merchant/${merchantId}`);
+  },
 };
 
 // Order API
@@ -87,10 +93,24 @@ export const cartAPI = {
   },
 };
 
+// Add a dedicated Merchant API object if needed
+export const merchantAPI = {
+  getMerchants: () => {
+    return apiClient.get('/merchants');
+  },
+  getMerchant: (id) => {
+    return apiClient.get(`/merchants/${id}`);
+  },
+  getMerchantByUsername: (username) => {
+    return apiClient.get(`/merchants/username/${username}`);
+  }
+};
+
 export default {
   auth: authAPI,
   products: productAPI,
   orders: orderAPI,
   user: userAPI,
   cart: cartAPI,
+  merchants: merchantAPI,
 }; 

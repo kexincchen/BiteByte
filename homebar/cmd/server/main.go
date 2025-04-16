@@ -3,31 +3,41 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/kexincchen/homebar/internal/api"
+	"github.com/kexincchen/homebar/internal/config"
+	"github.com/kexincchen/homebar/internal/db"
+	"github.com/kexincchen/homebar/internal/repository"
+	"github.com/kexincchen/homebar/internal/service"
 	"io/ioutil"
 	"log"
-	"time"
+	//"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// Initialize configuration
-	// config := config.LoadConfig()
+	cfg := config.Load()
+	dbConn, err := db.NewPostgres(cfg)
+	if err != nil {
+		log.Fatalf("db init error: %v", err)
+	}
+	defer dbConn.Close()
 
 	// Initialize repositories
 	// userRepo := repository.NewUserRepository(db)
-	// productRepo := repository.NewProductRepository(db)
+	productRepo := repository.NewProductRepository(dbConn)
 	// orderRepo := repository.NewOrderRepository(db)
 	// inventoryRepo := repository.NewInventoryRepository(db)
 
 	// Initialize services
 	// userService := service.NewUserService(userRepo)
-	// productService := service.NewProductService(productRepo)
+	productService := service.NewProductService(productRepo)
 	// orderService := service.NewOrderService(orderRepo, productRepo, inventoryRepo)
 
 	// Initialize handlers
 	// userHandler := api.NewUserHandler(userService)
-	// productHandler := api.NewProductHandler(productService)
+	productHandler := api.NewProductHandler(productService)
 	// orderHandler := api.NewOrderHandler(orderService)
 
 	// Setup router
@@ -50,12 +60,12 @@ func main() {
 		// Product routes
 		productRoutes := apiRoutes.Group("/products")
 		{
-			productRoutes.GET("", stubGetProductsHandler)
-			productRoutes.GET("/:id", stubGetProductHandler)
-			productRoutes.GET("/merchant/:id", stubGetProductsByMerchantHandler)
-			productRoutes.POST("", stubCreateProductHandler)
-			productRoutes.PUT("/:id", stubUpdateProductHandler)
-			productRoutes.DELETE("/:id", stubDeleteProductHandler)
+			productRoutes.GET("", productHandler.GetAll)
+			productRoutes.GET("/:id", productHandler.GetByID)
+			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
+			productRoutes.POST("", productHandler.Create)
+			productRoutes.PUT("/:id", productHandler.Update)
+			productRoutes.DELETE("/:id", productHandler.Delete)
 		}
 
 		// Order routes
@@ -147,84 +157,6 @@ func stubLoginHandler(c *gin.Context) {
 			"role":     "merchant",
 		},
 		"token": "mock-jwt-token-for-testing",
-	})
-}
-
-func stubGetProductsHandler(c *gin.Context) {
-	// Return mock products
-	c.JSON(200, []gin.H{
-		{
-			"id":           1,
-			"merchant_id":  1,
-			"name":         "Mojito",
-			"description":  "Classic cocktail with rum, mint, and lime",
-			"price":        8.99,
-			"category":     "Cocktails",
-			"image_url":    "https://via.placeholder.com/300x200.png?text=Mojito",
-			"is_available": true,
-		},
-		{
-			"id":           2,
-			"merchant_id":  1,
-			"name":         "Old Fashioned",
-			"description":  "Whiskey cocktail with sugar and bitters",
-			"price":        9.99,
-			"category":     "Cocktails",
-			"image_url":    "https://via.placeholder.com/300x200.png?text=Old+Fashioned",
-			"is_available": true,
-		},
-		{
-			"id":           3,
-			"merchant_id":  2,
-			"name":         "Margarita",
-			"description":  "Tequila cocktail with lime and salt",
-			"price":        7.99,
-			"category":     "Cocktails",
-			"image_url":    "https://via.placeholder.com/300x200.png?text=Margarita",
-			"is_available": true,
-		},
-	})
-}
-
-func stubGetProductHandler(c *gin.Context) {
-	id := c.Param("id")
-
-	// Return a mock product based on ID
-	c.JSON(200, gin.H{
-		"id":           id,
-		"merchant_id":  1,
-		"name":         "Mojito",
-		"description":  "Classic cocktail with rum, mint, and lime",
-		"price":        8.99,
-		"category":     "Cocktails",
-		"image_url":    "https://via.placeholder.com/300x200.png?text=Mojito",
-		"is_available": true,
-		"ingredients": []gin.H{
-			{
-				"id":       1,
-				"name":     "White Rum",
-				"quantity": 50, // in ml
-				"unit":     "ml",
-			},
-			{
-				"id":       2,
-				"name":     "Fresh Mint",
-				"quantity": 10, // leaves
-				"unit":     "leaves",
-			},
-			{
-				"id":       3,
-				"name":     "Lime Juice",
-				"quantity": 25, // in ml
-				"unit":     "ml",
-			},
-			{
-				"id":       4,
-				"name":     "Sugar Syrup",
-				"quantity": 15, // in ml
-				"unit":     "ml",
-			},
-		},
 	})
 }
 
@@ -383,110 +315,5 @@ func stubGetMerchantByUsernameHandler(c *gin.Context) {
 		"phone":         "555-123-4567",
 		"is_verified":   true,
 		"username":      username,
-	})
-}
-
-func stubGetProductsByMerchantHandler(c *gin.Context) {
-	merchantID := c.Param("id")
-
-	// Return mock products for the given merchant ID
-	c.JSON(200, []gin.H{
-		{
-			"id":           1,
-			"merchant_id":  merchantID,
-			"name":         "Mojito",
-			"description":  "Classic cocktail with rum, mint, and lime",
-			"price":        8.99,
-			"category":     "Cocktails",
-			"image_url":    "https://via.placeholder.com/300x200.png?text=Mojito",
-			"is_available": true,
-		},
-		{
-			"id":           2,
-			"merchant_id":  merchantID,
-			"name":         "Old Fashioned",
-			"description":  "Whiskey cocktail with sugar and bitters",
-			"price":        9.99,
-			"category":     "Cocktails",
-			"image_url":    "https://via.placeholder.com/300x200.png?text=Old+Fashioned",
-			"is_available": true,
-		},
-	})
-}
-
-func stubCreateProductHandler(c *gin.Context) {
-	// Get product data from request
-	var product struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Price       float64 `json:"price"`
-		Category    string  `json:"category"`
-		MerchantID  uint    `json:"merchant_id"`
-		ImageURL    string  `json:"image_url"`
-		IsAvailable bool    `json:"is_available"`
-	}
-
-	if err := c.BindJSON(&product); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid product data"})
-		return
-	}
-
-	// In a real app, we would save this to the database
-	// For demonstration, return a mock response with the created product
-	c.JSON(201, gin.H{
-		"id":           1,
-		"name":         product.Name,
-		"description":  product.Description,
-		"price":        product.Price,
-		"category":     product.Category,
-		"merchant_id":  product.MerchantID,
-		"image_url":    product.ImageURL,
-		"is_available": product.IsAvailable,
-		"created_at":   time.Now(),
-		"updated_at":   time.Now(),
-	})
-}
-
-func stubUpdateProductHandler(c *gin.Context) {
-	id := c.Param("id")
-
-	// Get product data from request
-	var product struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Price       float64 `json:"price"`
-		Category    string  `json:"category"`
-		MerchantID  uint    `json:"merchant_id"`
-		ImageURL    string  `json:"image_url"`
-		IsAvailable bool    `json:"is_available"`
-	}
-
-	if err := c.BindJSON(&product); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid product data"})
-		return
-	}
-
-	// In a real app, we would update the product in the database
-	// For demonstration, return a mock response with the updated product
-	c.JSON(200, gin.H{
-		"id":           id,
-		"name":         product.Name,
-		"description":  product.Description,
-		"price":        product.Price,
-		"category":     product.Category,
-		"merchant_id":  product.MerchantID,
-		"image_url":    product.ImageURL,
-		"is_available": product.IsAvailable,
-		"updated_at":   time.Now(),
-	})
-}
-
-func stubDeleteProductHandler(c *gin.Context) {
-	id := c.Param("id")
-
-	// In a real app, we would delete the product from the database
-	// For demonstration, just return a success response
-	c.JSON(200, gin.H{
-		"message": fmt.Sprintf("Product %s deleted successfully", id),
 	})
 }

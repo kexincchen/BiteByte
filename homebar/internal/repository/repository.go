@@ -2,9 +2,17 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"github.com/kexincchen/homebar/internal/repository/postgres"
 
 	"github.com/kexincchen/homebar/internal/domain"
 )
+
+// NewProductRepository returns a Postgres implementation that satisfies
+// ProductRepository. main.go only needs to import the interface package.
+func NewProductRepository(db *sql.DB) ProductRepository {
+	return postgres.NewProductRepository(db)
+}
 
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error

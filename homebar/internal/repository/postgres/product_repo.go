@@ -15,7 +15,7 @@ type ProductRepo struct {
 
 func NewProductRepository(db *sql.DB) *ProductRepo { return &ProductRepo{db: db} }
 
-// -----------------------  CRUD  -----------------------
+// CRUD
 
 func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	const q = `INSERT INTO products
@@ -46,37 +46,6 @@ func (r *ProductRepo) GetByID(ctx context.Context, id uint) (*domain.Product, er
 	return &p, nil
 }
 
-func (r *ProductRepo) GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Product, error) {
-	q := `SELECT id, merchant_id, name, description, price, category,
-		  image_url, is_available, created_at, updated_at
-		  FROM products`
-	var rows *sql.Rows
-	var err error
-
-	if merchantID == 0 {
-		rows, err = r.db.QueryContext(ctx, q) // all products
-	} else {
-		rows, err = r.db.QueryContext(ctx, q+" WHERE merchant_id=$1", merchantID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var list []*domain.Product
-	for rows.Next() {
-		var p domain.Product
-		if err := rows.Scan(
-			&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Category,
-			&p.ImageURL, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		list = append(list, &p)
-	}
-	return list, rows.Err()
-}
-
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
 	const q = `UPDATE products
 			   SET name=$1, description=$2, price=$3, category=$4,
@@ -104,4 +73,57 @@ func (r *ProductRepo) Delete(ctx context.Context, id uint) error {
 		return fmt.Errorf("product %d not found", id)
 	}
 	return nil
+}
+
+func (r *ProductRepo) GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Product, error) {
+	q := `SELECT id, merchant_id, name, description, price, category,
+		  image_url, is_available, created_at, updated_at
+		  FROM products`
+	var rows *sql.Rows
+	var err error
+
+	rows, err = r.db.QueryContext(ctx, q+" WHERE merchant_id=$1", merchantID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*domain.Product
+	for rows.Next() {
+		var p domain.Product
+		if err := rows.Scan(
+			&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Category,
+			&p.ImageURL, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, &p)
+	}
+	return list, rows.Err()
+}
+
+func (r *ProductRepo) GetAll(ctx context.Context) ([]*domain.Product, error) {
+	const q = `SELECT id, merchant_id, name, description, price, category,
+	           image_url, is_available, created_at, updated_at
+	           FROM products`
+
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*domain.Product
+	for rows.Next() {
+		var p domain.Product
+		if err := rows.Scan(
+			&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Category,
+			&p.ImageURL, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, &p)
+	}
+	return list, rows.Err()
 }

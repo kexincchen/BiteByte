@@ -9,9 +9,12 @@ import (
 )
 
 // NewProductRepository returns a Postgres implementation that satisfies
-// ProductRepository. main.go only needs to import the interface package.
 func NewProductRepository(db *sql.DB) ProductRepository {
 	return postgres.NewProductRepository(db)
+}
+
+func NewUserRepository(db *sql.DB) UserRepository {
+	return postgres.NewUserRepository(db)
 }
 
 type UserRepository interface {
@@ -25,9 +28,10 @@ type UserRepository interface {
 type ProductRepository interface {
 	Create(ctx context.Context, product *domain.Product) error
 	GetByID(ctx context.Context, id uint) (*domain.Product, error)
-	GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Product, error)
 	Update(ctx context.Context, product *domain.Product) error
 	Delete(ctx context.Context, id uint) error
+	GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Product, error)
+	GetAll(ctx context.Context) ([]*domain.Product, error)
 }
 
 type OrderRepository interface {

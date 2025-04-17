@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"github.com/kexincchen/homebar/internal/api"
 	"github.com/kexincchen/homebar/internal/config"
@@ -22,21 +23,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("db init error: %v", err)
 	}
-	defer dbConn.Close()
+	defer func(dbConn *sql.DB) {
+		err := dbConn.Close()
+		if err != nil {
+			log.Fatalf("db close error: %v", err)
+		}
+	}(dbConn)
 
 	// Initialize repositories
-	// userRepo := repository.NewUserRepository(db)
+	userRepo := repository.NewUserRepository(dbConn)
 	productRepo := repository.NewProductRepository(dbConn)
 	// orderRepo := repository.NewOrderRepository(db)
 	// inventoryRepo := repository.NewInventoryRepository(db)
 
 	// Initialize services
-	// userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo)
 	productService := service.NewProductService(productRepo)
 	// orderService := service.NewOrderService(orderRepo, productRepo, inventoryRepo)
 
 	// Initialize handlers
-	// userHandler := api.NewUserHandler(userService)
+	userHandler := api.NewUserHandler(userService)
 	productHandler := api.NewProductHandler(productService)
 	// orderHandler := api.NewOrderHandler(orderService)
 
@@ -53,19 +59,19 @@ func main() {
 		authRoutes := apiRoutes.Group("/auth")
 		{
 			// For now, we'll use stub handlers until we implement the full functionality
-			authRoutes.POST("/register", stubRegisterHandler)
-			authRoutes.POST("/login", stubLoginHandler)
+			authRoutes.POST("/register", userHandler.Register)
+			authRoutes.POST("/login", userHandler.Login)
 		}
 
 		// Product routes
 		productRoutes := apiRoutes.Group("/products")
 		{
-			productRoutes.GET("", productHandler.GetAll)
-			productRoutes.GET("/:id", productHandler.GetByID)
-			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
 			productRoutes.POST("", productHandler.Create)
+			productRoutes.GET("/:id", productHandler.GetByID)
 			productRoutes.PUT("/:id", productHandler.Update)
 			productRoutes.DELETE("/:id", productHandler.Delete)
+			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
+			productRoutes.GET("", productHandler.GetAll)
 		}
 
 		// Order routes
@@ -112,52 +118,6 @@ func corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
-}
-
-// Stub handlers for testing
-func stubRegisterHandler(c *gin.Context) {
-	var req struct {
-		Username string `json:"username"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
-	}
-
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request"})
-		return
-	}
-
-	// Return a mock user
-	c.JSON(201, gin.H{
-		"id":       1,
-		"username": req.Username,
-		"email":    req.Email,
-		"role":     req.Role,
-	})
-}
-
-func stubLoginHandler(c *gin.Context) {
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request"})
-		return
-	}
-
-	// Return a mock user and token
-	c.JSON(200, gin.H{
-		"user": gin.H{
-			"id":       1,
-			"username": "demoUser",
-			"email":    req.Email,
-			"role":     "merchant",
-		},
-		"token": "mock-jwt-token-for-testing",
-	})
 }
 
 func stubCreateOrderHandler(c *gin.Context) {

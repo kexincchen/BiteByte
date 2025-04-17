@@ -17,51 +17,7 @@ func NewProductHandler(ps *service.ProductService) *ProductHandler {
 	return &ProductHandler{productService: ps}
 }
 
-// GET /api/products
-func (h *ProductHandler) GetAll(c *gin.Context) {
-	products, err := h.productService.GetAll(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, products)
-}
-
-// GET /api/products/:id
-func (h *ProductHandler) GetByID(c *gin.Context) {
-	idParam := c.Param("id")
-	id64, err := strconv.ParseUint(idParam, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
-		return
-	}
-
-	product, err := h.productService.GetByID(c.Request.Context(), uint(id64))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, product)
-}
-
-// GET /api/products/merchant/:id
-func (h *ProductHandler) GetByMerchant(c *gin.Context) {
-	merchantIDParam := c.Param("id")
-	mid, err := strconv.ParseUint(merchantIDParam, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid merchant id"})
-		return
-	}
-
-	products, err := h.productService.GetByMerchant(c.Request.Context(), uint(mid))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, products)
-}
-
-// POST /api/products
+// Create POST /api/products
 func (h *ProductHandler) Create(c *gin.Context) {
 	var req struct {
 		Name        string  `json:"name"`
@@ -97,7 +53,24 @@ func (h *ProductHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
-// PUT /api/products/:id
+// GetByID GET /api/products/:id
+func (h *ProductHandler) GetByID(c *gin.Context) {
+	idParam := c.Param("id")
+	id64, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
+		return
+	}
+
+	product, err := h.productService.GetByID(c.Request.Context(), uint(id64))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, product)
+}
+
+// Update PUT /api/products/:id
 func (h *ProductHandler) Update(c *gin.Context) {
 	idParam := c.Param("id")
 	id64, err := strconv.ParseUint(idParam, 10, 64)
@@ -139,7 +112,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
-// DELETE /api/products/:id
+// Delete DELETE /api/products/:id
 func (h *ProductHandler) Delete(c *gin.Context) {
 	idParam := c.Param("id")
 	id64, err := strconv.ParseUint(idParam, 10, 64)
@@ -153,4 +126,31 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
+}
+
+// GetByMerchant GET /api/products/merchant/:id
+func (h *ProductHandler) GetByMerchant(c *gin.Context) {
+	merchantIDParam := c.Param("id")
+	mid, err := strconv.ParseUint(merchantIDParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid merchant id"})
+		return
+	}
+
+	products, err := h.productService.GetByMerchant(c.Request.Context(), uint(mid))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, products)
+}
+
+// GetAll GET /api/products
+func (h *ProductHandler) GetAll(c *gin.Context) {
+	products, err := h.productService.GetAll(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, products)
 }

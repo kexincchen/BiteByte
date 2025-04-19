@@ -49,4 +49,22 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL
 );  
 
+CREATE TABLE IF NOT EXISTS orders (
+  id           SERIAL PRIMARY KEY,
+  customer_id  INT      NOT NULL,
+  merchant_id  INT      NOT NULL,
+  total_amount NUMERIC(10,2) NOT NULL,
+  status       TEXT     NOT NULL,
+  notes        TEXT,
+  created_at   TIMESTAMPTZ NOT NULL,
+  updated_at   TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id         SERIAL PRIMARY KEY,
+  order_id   INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INT NOT NULL,
+  quantity   INT NOT NULL,
+  price      NUMERIC(10,2) NOT NULL
+);
 ```

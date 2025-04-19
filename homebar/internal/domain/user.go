@@ -30,10 +30,14 @@ type Customer struct {
 }
 
 type Merchant struct {
-	UserID       uint   `json:"user_id"`
-	BusinessName string `json:"business_name"`
-	Description  string `json:"description"`
-	Address      string `json:"address"`
-	Phone        string `json:"phone"`
-	IsVerified   bool   `json:"is_verified"`
-} 
+	ID           uint      `json:"id"`
+	UserID       uint      `json:"user_id"`
+	BusinessName string    `json:"business_name"`
+	Description  string    `json:"description"`
+	Address      string    `json:"address"`
+	Phone        string    `json:"phone"`
+	Username     string    `json:"username"`
+	IsVerified   bool      `json:"is_verified"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}

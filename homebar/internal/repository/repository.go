@@ -8,7 +8,6 @@ import (
 	"github.com/kexincchen/homebar/internal/domain"
 )
 
-// NewProductRepository returns a Postgres implementation that satisfies
 func NewProductRepository(db *sql.DB) ProductRepository {
 	return postgres.NewProductRepository(db)
 }
@@ -19,6 +18,10 @@ func NewUserRepository(db *sql.DB) UserRepository {
 
 func NewOrderRepository(db *sql.DB) OrderRepository {
 	return postgres.NewOrderRepository(db)
+}
+
+func NewMerchantRepository(db *sql.DB) MerchantRepository {
+	return postgres.NewMerchantRepository(db)
 }
 
 type UserRepository interface {
@@ -49,4 +52,13 @@ type InventoryRepository interface {
 	GetByMerchantAndIngredient(ctx context.Context, merchantID, ingredientID uint) (*domain.Inventory, error)
 	UpdateQuantity(ctx context.Context, inventoryID uint, quantityChange float64) error
 	LogTransaction(ctx context.Context, transaction *domain.InventoryTransaction) error
+}
+
+type MerchantRepository interface {
+	Create(ctx context.Context, m *domain.Merchant) error
+	GetByID(ctx context.Context, id uint) (*domain.Merchant, error)
+	GetByUsername(ctx context.Context, username string) (*domain.Merchant, error)
+	List(ctx context.Context) ([]*domain.Merchant, error)
+	Update(ctx context.Context, m *domain.Merchant) error
+	Delete(ctx context.Context, id uint) error
 }

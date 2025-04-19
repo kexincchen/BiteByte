@@ -31,17 +31,20 @@ func main() {
 	userRepo := repository.NewUserRepository(dbConn)
 	productRepo := repository.NewProductRepository(dbConn)
 	orderRepo := repository.NewOrderRepository(dbConn)
+	merchantRepo := repository.NewMerchantRepository(dbConn)
 	// inventoryRepo := repository.NewInventoryRepository(db)
 
 	// Initialize services
 	userService := service.NewUserService(userRepo)
 	productService := service.NewProductService(productRepo)
 	orderService := service.NewOrderService(orderRepo, productRepo, nil)
+	merchantService := service.NewMerchantService(merchantRepo)
 
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
 	productHandler := api.NewProductHandler(productService)
 	orderHandler := api.NewOrderHandler(orderService)
+	merchantHandler := api.NewMerchantHandler(merchantService)
 
 	// Setup router
 	router := gin.Default()
@@ -81,9 +84,9 @@ func main() {
 		// Merchant routes
 		merchantRoutes := apiRoutes.Group("/merchants")
 		{
-			merchantRoutes.GET("", stubGetMerchantsHandler)
-			merchantRoutes.GET("/:id", stubGetMerchantHandler)
-			merchantRoutes.GET("/username/:username", stubGetMerchantByUsernameHandler)
+			merchantRoutes.GET("", merchantHandler.List)
+			merchantRoutes.GET("/:id", merchantHandler.GetByID)
+			merchantRoutes.GET("/username/:username", merchantHandler.GetByUsername)
 		}
 	}
 
@@ -114,63 +117,4 @@ func corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
-}
-
-func stubGetMerchantsHandler(c *gin.Context) {
-	// Return a list of mock merchants
-	c.JSON(200, []gin.H{
-		{
-			"id":            1,
-			"user_id":       2,
-			"business_name": "Cocktail Haven",
-			"description":   "Specializing in premium cocktails with a modern twist",
-			"address":       "123 Main St, City",
-			"phone":         "555-123-4567",
-			"is_verified":   true,
-			"username":      "cocktailhaven",
-		},
-		{
-			"id":            2,
-			"user_id":       3,
-			"business_name": "Tropical Tastes",
-			"description":   "Exotic beach-inspired drinks and cocktails",
-			"address":       "456 Ocean Ave, Beach City",
-			"phone":         "555-987-6543",
-			"is_verified":   true,
-			"username":      "tropicaltastes",
-		},
-	})
-}
-
-func stubGetMerchantHandler(c *gin.Context) {
-	id := c.Param("id")
-
-	// Return a mock merchant based on ID
-	c.JSON(200, gin.H{
-		"id":            id,
-		"user_id":       2,
-		"business_name": "Cocktail Haven",
-		"description":   "Specializing in premium cocktails with a modern twist",
-		"address":       "123 Main St, City",
-		"phone":         "555-123-4567",
-		"is_verified":   true,
-		"username":      "cocktailhaven",
-	})
-}
-
-func stubGetMerchantByUsernameHandler(c *gin.Context) {
-	username := c.Param("username")
-
-	// In a real app, we would search for the merchant by username
-	// For demo purposes, just return a mock merchant with the given username
-	c.JSON(200, gin.H{
-		"id":            1,
-		"user_id":       2,
-		"business_name": "Cocktail Haven",
-		"description":   "Specializing in premium cocktails with a modern twist",
-		"address":       "123 Main St, City",
-		"phone":         "555-123-4567",
-		"is_verified":   true,
-		"username":      username,
-	})
 }

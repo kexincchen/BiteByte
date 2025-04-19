@@ -67,4 +67,18 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity   INT NOT NULL,
   price      NUMERIC(10,2) NOT NULL
 );
+  
+CREATE TABLE IF NOT EXISTS merchants (
+  id            SERIAL PRIMARY KEY,
+  user_id       INT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  business_name TEXT NOT NULL,
+  description   TEXT,
+  address       TEXT,
+  phone         TEXT,
+  username      TEXT UNIQUE NOT NULL,
+  is_verified   BOOLEAN DEFAULT FALSE,
+  created_at    TIMESTAMPTZ NOT NULL,
+  updated_at    TIMESTAMPTZ NOT NULL
+);
+  
 ```

@@ -84,6 +84,7 @@ func main() {
 		// Merchant routes
 		merchantRoutes := apiRoutes.Group("/merchants")
 		{
+			merchantRoutes.POST("", merchantHandler.Create)
 			merchantRoutes.GET("", merchantHandler.List)
 			merchantRoutes.GET("/:id", merchantHandler.GetByID)
 			merchantRoutes.GET("/username/:username", merchantHandler.GetByUsername)

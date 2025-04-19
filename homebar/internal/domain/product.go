@@ -21,11 +21,11 @@ type Ingredient struct {
 	ID          uint   `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Unit        string `json:"unit"` // e.g., ml, g, pieces
+	Unit        string `json:"unit"`
 }
 
 type ProductIngredient struct {
 	ProductID    uint    `json:"product_id"`
 	IngredientID uint    `json:"ingredient_id"`
 	Quantity     float64 `json:"quantity"`
-} 
+}

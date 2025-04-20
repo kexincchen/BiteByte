@@ -19,20 +19,42 @@ const Dashboard = () => {
       }
 
       try {
-        // Fetch recent orders
-        const ordersResponse = await orderAPI.getOrders();
-        setRecentOrders(ordersResponse.data.slice(0, 5)); // Get only 5 most recent orders
+        // First, make sure merchant_id exists and is valid
+        if (!currentUser.merchant_id) {
+          console.error("No merchant_id found for the current user");
+          setError("Your merchant account is not properly set up. Please contact support.");
+          setLoading(false);
+          return;
+        }
+
+        // Fetch recent orders - include merchant_id as a query parameter
+        const ordersResponse = await orderAPI.getOrdersByMerchant(currentUser.merchant_id);
+        setRecentOrders(Array.isArray(ordersResponse.data) 
+          ? ordersResponse.data.slice(0, 5) 
+          : []);
 
         // Fetch products count
-        const productsResponse = await productAPI.getProductsByMerchant(
-          currentUser.merchant_id
-        );
-        setProductCount(productsResponse.data.length);
+        const productsResponse = await productAPI.getProductsByMerchant(currentUser.merchant_id);
+        setProductCount(Array.isArray(productsResponse.data) 
+          ? productsResponse.data.length 
+          : 0);
 
         setLoading(false);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
-        setError("Failed to load dashboard data");
+        // More detailed error message
+        let errorMessage = "Failed to load dashboard data";
+        if (error.response) {
+          if (error.response.status === 400) {
+            errorMessage += ": Invalid request. Please check your merchant profile.";
+          } else if (error.response.status === 401) {
+            errorMessage += ": Authentication error. Please log in again.";
+          } else if (error.response.status === 403) {
+            errorMessage += ": You don't have permission to access this data.";
+          }
+        }
+        
+        setError(errorMessage);
         setLoading(false);
       }
     };

@@ -62,6 +62,7 @@ type InventoryRepository interface {
 type MerchantRepository interface {
 	Create(ctx context.Context, m *domain.Merchant) error
 	GetByID(ctx context.Context, id uint) (*domain.Merchant, error)
+	GetByUserID(ctx context.Context, userID uint) (*domain.Merchant, error)
 	GetByUsername(ctx context.Context, username string) (*domain.Merchant, error)
 	List(ctx context.Context) ([]*domain.Merchant, error)
 	Update(ctx context.Context, m *domain.Merchant) error

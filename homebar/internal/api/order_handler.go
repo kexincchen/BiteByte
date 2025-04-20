@@ -5,6 +5,7 @@ import (
 	"github.com/kexincchen/homebar/internal/service"
 	"net/http"
 	"strconv"
+	"fmt"
 )
 
 type OrderHandler struct{ svc *service.OrderService }
@@ -71,4 +72,53 @@ func (h *OrderHandler) List(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusBadRequest, gin.H{"error": "missing filter"})
+}
+
+// GetByUser retrieves orders for any user (merchant or customer) based on role
+func (h *OrderHandler) GetByUser(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		return
+	}
+
+	// Get the role from query parameter or from JWT token
+	role := c.Query("role")
+	if role == "" {
+		// If not provided in query, try to get from the authenticated user
+		// This would require middleware to set user info in the context
+		if userInfo, exists := c.Get("user"); exists {
+			if user, ok := userInfo.(map[string]interface{}); ok {
+				role = user["role"].(string)
+			}
+		}
+	}
+
+	var orders interface{}
+	var fetchErr error
+
+	switch role {
+	case "merchant":
+		// Get merchant ID from user ID
+		merchant, err := h.merchantService.GetByUserID(c.Request.Context(), uint(userID))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("merchant not found for user ID %d", userID)})
+			return
+		}
+		orders, fetchErr = h.svc.GetByMerchant(c.Request.Context(), merchant.ID)
+	case "customer":
+		// Get customer ID from user ID or use user ID directly if your system allows
+		orders, fetchErr = h.svc.GetByCustomer(c.Request.Context(), uint(userID))
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or missing role parameter"})
+		return
+	}
+
+	if fetchErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fetchErr.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, orders)
 }

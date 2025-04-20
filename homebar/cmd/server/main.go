@@ -1,18 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/kexincchen/homebar/internal/api"
 	"github.com/kexincchen/homebar/internal/config"
 	"github.com/kexincchen/homebar/internal/db"
 	"github.com/kexincchen/homebar/internal/repository"
 	"github.com/kexincchen/homebar/internal/service"
-
 	//"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -55,6 +59,9 @@ func main() {
 	// Enable CORS middleware
 	router.Use(corsMiddleware())
 
+	// Add logger middleware
+	router.Use(loggerMiddleware())
+
 	// Define routes
 	apiRoutes := router.Group("/api")
 	{
@@ -82,6 +89,7 @@ func main() {
 			orderRoutes.POST("", orderHandler.Create)
 			orderRoutes.GET("", orderHandler.List)
 			orderRoutes.GET("/:id", orderHandler.GetByID)
+			orderRoutes.GET("/user/:id", orderHandler.GetByUser)
 		}
 
 		// Merchant routes
@@ -91,6 +99,7 @@ func main() {
 			merchantRoutes.GET("", merchantHandler.List)
 			merchantRoutes.GET("/:id", merchantHandler.GetByID)
 			merchantRoutes.GET("/username/:username", merchantHandler.GetByUsername)
+			merchantRoutes.GET("/user/:userID", merchantHandler.GetByUserID)
 		}
 	}
 
@@ -121,4 +130,51 @@ func corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// Logger middleware
+func loggerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Log request details
+		startTime := time.Now()
+		requestID := uuid.New().String()
+
+		// Set request ID header for tracking
+		c.Writer.Header().Set("X-Request-ID", requestID)
+
+		// Get request body
+		var requestBody []byte
+		if c.Request.Body != nil {
+			requestBody, _ = ioutil.ReadAll(c.Request.Body)
+			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
+		}
+
+		log.Printf("[%s] API Request: %s %s\nHeaders: %v\nBody: %s",
+			requestID, c.Request.Method, c.Request.URL.Path,
+			c.Request.Header, string(requestBody))
+
+		// Use ResponseWriter wrapper to capture response
+		blw := &bodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		c.Writer = blw
+
+		// Process request
+		c.Next()
+
+		// Log response
+		latency := time.Since(startTime)
+		log.Printf("[%s] API Response: %d %s (%s)\nBody: %s",
+			requestID, c.Writer.Status(), http.StatusText(c.Writer.Status()),
+			latency, blw.body.String())
+	}
+}
+
+// Response body logger
+type bodyLogWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w bodyLogWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
 }

@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
+
 	"github.com/kexincchen/homebar/internal/domain"
 )
 
@@ -92,4 +94,25 @@ func (r *MerchantRepo) Update(ctx context.Context, m *domain.Merchant) error {
 func (r *MerchantRepo) Delete(ctx context.Context, id uint) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM merchants WHERE id=$1`, id)
 	return err
+}
+
+func (r *MerchantRepo) GetByUserID(ctx context.Context, userID uint) (*domain.Merchant, error) {
+	const q = `SELECT id, user_id, business_name, description, address, phone, username,
+			   is_verified, created_at, updated_at
+			   FROM merchants WHERE user_id=$1`
+
+	var m domain.Merchant
+	err := r.db.QueryRowContext(ctx, q, userID).Scan(
+		&m.ID, &m.UserID, &m.BusinessName, &m.Description, &m.Address, &m.Phone, &m.Username,
+		&m.IsVerified, &m.CreatedAt, &m.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no merchant found for user ID %d", userID)
+		}
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+
+	return &m, nil
 }

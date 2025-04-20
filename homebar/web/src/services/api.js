@@ -1,20 +1,20 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Base API URL - in a real app, you'd use environment variables
-const API_URL = 'http://localhost:8080/api';
+const API_URL = "http://localhost:8080/api";
 
 // Create an axios instance with default config
 const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // Add a request interceptor to attach the auth token to every request
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -28,23 +28,23 @@ apiClient.interceptors.request.use(
 // Auth API
 export const authAPI = {
   register: (userData) => {
-    return apiClient.post('/auth/register', userData);
+    return apiClient.post("/auth/register", userData);
   },
   login: (email, password) => {
-    return apiClient.post('/auth/login', { email, password });
+    return apiClient.post("/auth/login", { email, password });
   },
 };
 
 // Product API
 export const productAPI = {
   getProducts: () => {
-    return apiClient.get('/products');
+    return apiClient.get("/products");
   },
   getProduct: (id) => {
     return apiClient.get(`/products/${id}`);
   },
   createProduct: (productData) => {
-    return apiClient.post('/products', productData);
+    return apiClient.post("/products", productData);
   },
   updateProduct: (id, productData) => {
     return apiClient.put(`/products/${id}`, productData);
@@ -63,10 +63,10 @@ export const productAPI = {
 // Order API
 export const orderAPI = {
   createOrder: (orderData) => {
-    return apiClient.post('/orders', orderData);
+    return apiClient.post("/orders", orderData);
   },
   getOrders: () => {
-    return apiClient.get('/orders');
+    return apiClient.get("/orders");
   },
   getOrder: (id) => {
     return apiClient.get(`/orders/${id}`);
@@ -74,35 +74,87 @@ export const orderAPI = {
   updateOrderStatus: (id, status) => {
     return apiClient.patch(`/orders/${id}/status`, { status });
   },
+  getOrdersByUser: (userId, role) => {
+    return apiClient.get(`/orders/user/${userId}?role=${role}`);
+  },
 };
 
 // User/Profile API
 export const userAPI = {
   getProfile: () => {
-    return apiClient.get('/users/me');
+    return apiClient.get("/users/me");
   },
   updateProfile: (userData) => {
-    return apiClient.put('/users/me', userData);
+    return apiClient.put("/users/me", userData);
   },
 };
 
 // Cart API (if needed on server side)
 export const cartAPI = {
   checkout: (cartData) => {
-    return apiClient.post('/cart/checkout', cartData);
+    return apiClient.post("/cart/checkout", cartData);
   },
 };
 
 // Add a dedicated Merchant API object if needed
 export const merchantAPI = {
   getMerchants: () => {
-    return apiClient.get('/merchants');
+    return apiClient.get("/merchants");
   },
   getMerchant: (id) => {
     return apiClient.get(`/merchants/${id}`);
   },
   getMerchantByUsername: (username) => {
     return apiClient.get(`/merchants/username/${username}`);
+  },
+};
+
+// Add this utility function
+export const fetchWithAuth = async (url, options = {}) => {
+  const token = localStorage.getItem("token");
+
+  const defaultOptions = {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  };
+
+  const mergedOptions = {
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...(options.headers || {}),
+    },
+  };
+
+  try {
+    const response = await fetch(url, mergedOptions);
+
+    // Check if the response is JSON
+    const contentType = response.headers.get("content-type");
+    const isJson = contentType && contentType.includes("application/json");
+
+    // Parse the response
+    const data = isJson ? await response.json() : await response.text();
+
+    // Check if the response is successful
+    if (!response.ok) {
+      const error = new Error(
+        isJson && data.error
+          ? data.error
+          : `HTTP error! Status: ${response.status}`
+      );
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`API error for ${url}:`, error);
+    throw error;
   }
 };
 
@@ -113,4 +165,4 @@ export default {
   user: userAPI,
   cart: cartAPI,
   merchants: merchantAPI,
-}; 
+};

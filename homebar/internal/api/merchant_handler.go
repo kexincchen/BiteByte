@@ -1,10 +1,12 @@
 package api
 
 import (
-	"github.com/kexincchen/homebar/internal/domain"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/kexincchen/homebar/internal/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kexincchen/homebar/internal/service"
@@ -112,4 +114,24 @@ func (h *MerchantHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// GetByUserID retrieves a merchant by user ID
+func (h *MerchantHandler) GetByUserID(c *gin.Context) {
+	userIDStr := c.Param("userID")
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		return
+	}
+
+	merchant, err := h.svc.GetByUserID(c.Request.Context(), uint(userID))
+	if err != nil {
+		// More detailed error message for troubleshooting
+		errorMsg := fmt.Sprintf("merchant not found for user ID %d: %v", userID, err)
+		c.JSON(http.StatusNotFound, gin.H{"error": errorMsg})
+		return
+	}
+
+	c.JSON(http.StatusOK, merchant)
 }

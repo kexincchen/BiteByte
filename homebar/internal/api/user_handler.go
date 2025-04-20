@@ -110,7 +110,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.Login(c.Request.Context(), req.Email, req.Password)
+	userData, err := h.userService.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -118,7 +118,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 	// In a real application, you would generate a JWT token here
 	c.JSON(http.StatusOK, gin.H{
-		"user":  user,
+		"user":  userData,
 		"token": "sample-jwt-token", // This would be a real JWT token
 	})
 }

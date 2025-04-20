@@ -52,11 +52,17 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
   };
 
+  const updateCurrentUser = (updatedUser) => {
+    setCurrentUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   const value = {
     currentUser,
     login,
     register,
     logout,
+    updateCurrentUser,
     loading
   };
 

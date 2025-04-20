@@ -4,7 +4,7 @@ import { orderAPI, productAPI } from "../../services/api";
 import { AuthContext } from "../../contexts/AuthContext";
 
 const Dashboard = () => {
-  const { currentUser } = useContext(AuthContext);
+  const { currentUser, updateCurrentUser } = useContext(AuthContext);
   const [recentOrders, setRecentOrders] = useState([]);
   const [productCount, setProductCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -19,48 +19,91 @@ const Dashboard = () => {
       }
 
       try {
-        // First, make sure merchant_id exists and is valid
-        if (!currentUser.merchant_id) {
-          console.error("No merchant_id found for the current user");
-          setError("Your merchant account is not properly set up. Please contact support.");
-          setLoading(false);
-          return;
+        console.log("Current user: ", currentUser);
+
+        if (currentUser.merchant_id) {
+          // If merchant_id exists, use it directly
+          await fetchMerchantData(currentUser.merchant_id);
+        } else {
+          // Otherwise, try to fetch the merchant data by user ID
+          try {
+            const merchantResponse = await fetch(
+              `/api/merchants/user/${currentUser.id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              }
+            );
+
+            if (!merchantResponse.ok) {
+              throw new Error(`HTTP error! Status: ${merchantResponse.status}`);
+            }
+
+            const merchantData = await merchantResponse.json();
+            console.log("Merchant data: ", merchantData);
+
+            if (merchantData && merchantData.id) {
+              // Update the user with merchant_id
+              const updatedUser = {
+                ...currentUser,
+                merchant_id: merchantData.id,
+                business_name:
+                  merchantData.business_name || merchantData.businessName,
+              };
+              updateCurrentUser(updatedUser);
+
+              // Continue with the merchant data
+              await fetchMerchantData(merchantData.id);
+            } else {
+              setError(
+                "Could not retrieve merchant information. Please contact support."
+              );
+              setLoading(false);
+            }
+          } catch (err) {
+            console.error("Error fetching merchant data:", err);
+            setError("Failed to load merchant profile: " + err.message);
+            setLoading(false);
+          }
         }
+      } catch (err) {
+        console.error("Dashboard initialization error:", err);
+        setError("An error occurred while loading dashboard data");
+        setLoading(false);
+      }
+    };
 
-        // Fetch recent orders - include merchant_id as a query parameter
-        const ordersResponse = await orderAPI.getOrdersByMerchant(currentUser.merchant_id);
-        setRecentOrders(Array.isArray(ordersResponse.data) 
-          ? ordersResponse.data.slice(0, 5) 
-          : []);
+    const fetchMerchantData = async (merchantId) => {
+      try {
+        // Get orders
+        const ordersResponse = await orderAPI.getOrdersByUser(currentUser.id, "merchant");
+        setRecentOrders(
+          Array.isArray(ordersResponse.data)
+            ? ordersResponse.data.slice(0, 5)
+            : []
+        );
 
-        // Fetch products count
-        const productsResponse = await productAPI.getProductsByMerchant(currentUser.merchant_id);
-        setProductCount(Array.isArray(productsResponse.data) 
-          ? productsResponse.data.length 
-          : 0);
+        // Get product count
+        const productsResponse = await productAPI.getProductsByMerchant(
+          merchantId
+        );
+        setProductCount(
+          Array.isArray(productsResponse.data)
+            ? productsResponse.data.length
+            : 0
+        );
 
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        // More detailed error message
-        let errorMessage = "Failed to load dashboard data";
-        if (error.response) {
-          if (error.response.status === 400) {
-            errorMessage += ": Invalid request. Please check your merchant profile.";
-          } else if (error.response.status === 401) {
-            errorMessage += ": Authentication error. Please log in again.";
-          } else if (error.response.status === 403) {
-            errorMessage += ": You don't have permission to access this data.";
-          }
-        }
-        
-        setError(errorMessage);
+        console.error("Error fetching merchant data:", error);
+        setError("Failed to load merchant data: " + error.message);
         setLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, [currentUser]);
+  }, [currentUser, updateCurrentUser]);
 
   if (loading) return <div>Loading dashboard...</div>;
   if (error) return <div className="error">{error}</div>;

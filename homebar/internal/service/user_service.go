@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/kexincchen/homebar/internal/domain"
@@ -63,17 +64,58 @@ func (s *UserService) Register(ctx context.Context, username, email, password st
 	return user, nil
 }
 
-func (s *UserService) Login(ctx context.Context, email, password string) (*domain.User, error) {
+// Login authenticates a user and returns complete user data including role-specific information
+func (s *UserService) Login(ctx context.Context, email, password string) (map[string]interface{}, error) {
+	// Get basic user information
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, errors.New("invalid email or password")
 	}
 
+	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return nil, errors.New("invalid email or password")
 	}
 
-	return user, nil
+	// Create a response object with basic user info
+	response := map[string]interface{}{
+		"id":         user.ID,
+		"username":   user.Username,
+		"email":      user.Email,
+		"role":       user.Role,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
+	}
+
+	// Add role-specific information
+	if user.Role == domain.RoleMerchant {
+		merchant, err := s.merchantRepo.GetByUserID(ctx, user.ID)
+		if err == nil {
+			response["merchant_id"] = merchant.ID
+			response["business_name"] = merchant.BusinessName
+			response["is_verified"] = merchant.IsVerified
+			// Add more fields that might be useful
+			response["merchant_address"] = merchant.Address
+			response["merchant_phone"] = merchant.Phone
+			response["merchant_description"] = merchant.Description
+		} else {
+			// Log the error but don't fail the login
+			log.Printf("Warning: Could not retrieve merchant data for user %d: %v", user.ID, err)
+		}
+	} else if user.Role == domain.RoleCustomer {
+		customer, err := s.customerRepo.GetByUserID(ctx, user.ID)
+		if err == nil {
+			response["first_name"] = customer.FirstName
+			response["last_name"] = customer.LastName
+			response["customer_address"] = customer.Address
+			response["customer_phone"] = customer.Phone
+		} else {
+			// Log the error but don't fail the login
+			log.Printf("Warning: Could not retrieve customer data for user %d: %v", user.ID, err)
+		}
+	}
+
+	return response, nil
 }
 
 // RegisterCustomer creates a user with customer details

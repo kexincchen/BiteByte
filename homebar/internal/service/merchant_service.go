@@ -38,3 +38,8 @@ func (s *MerchantService) Update(ctx context.Context, m *domain.Merchant) error 
 func (s *MerchantService) Delete(ctx context.Context, id uint) error {
 	return s.repo.Delete(ctx, id)
 }
+
+// GetByUserID retrieves a merchant by user ID
+func (s *MerchantService) GetByUserID(ctx context.Context, userID uint) (*domain.Merchant, error) {
+	return s.repo.GetByUserID(ctx, userID)
+}

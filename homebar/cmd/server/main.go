@@ -2,12 +2,14 @@ package main
 
 import (
 	"database/sql"
+	"log"
+
 	"github.com/kexincchen/homebar/internal/api"
 	"github.com/kexincchen/homebar/internal/config"
 	"github.com/kexincchen/homebar/internal/db"
 	"github.com/kexincchen/homebar/internal/repository"
 	"github.com/kexincchen/homebar/internal/service"
-	"log"
+
 	//"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,13 +31,14 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(dbConn)
+	customerRepo := repository.NewCustomerRepository(dbConn)
 	productRepo := repository.NewProductRepository(dbConn)
 	orderRepo := repository.NewOrderRepository(dbConn)
 	merchantRepo := repository.NewMerchantRepository(dbConn)
 	// inventoryRepo := repository.NewInventoryRepository(db)
 
-	// Initialize services
-	userService := service.NewUserService(userRepo)
+	// Initialize services with all repositories
+	userService := service.NewUserService(userRepo, customerRepo, merchantRepo, dbConn)
 	productService := service.NewProductService(productRepo)
 	orderService := service.NewOrderService(orderRepo, productRepo, nil)
 	merchantService := service.NewMerchantService(merchantRepo)

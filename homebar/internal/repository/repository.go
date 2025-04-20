@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+
 	"github.com/kexincchen/homebar/internal/repository/postgres"
 
 	"github.com/kexincchen/homebar/internal/domain"
@@ -22,6 +23,10 @@ func NewOrderRepository(db *sql.DB) OrderRepository {
 
 func NewMerchantRepository(db *sql.DB) MerchantRepository {
 	return postgres.NewMerchantRepository(db)
+}
+
+func NewCustomerRepository(db *sql.DB) CustomerRepository {
+	return postgres.NewCustomerRepository(db)
 }
 
 type UserRepository interface {
@@ -61,4 +66,11 @@ type MerchantRepository interface {
 	List(ctx context.Context) ([]*domain.Merchant, error)
 	Update(ctx context.Context, m *domain.Merchant) error
 	Delete(ctx context.Context, id uint) error
+}
+
+type CustomerRepository interface {
+	Create(ctx context.Context, customer *domain.Customer) error
+	GetByUserID(ctx context.Context, userID uint) (*domain.Customer, error)
+	Update(ctx context.Context, customer *domain.Customer) error
+	Delete(ctx context.Context, userID uint) error
 }

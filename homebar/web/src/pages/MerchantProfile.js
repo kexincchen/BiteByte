@@ -49,11 +49,11 @@ const MerchantProfile = () => {
       </div>
       
       <h2>Menu</h2>
-      {products.length === 0 ? (
+      {products && products.length === 0 ? (
         <p>This merchant doesn't have any products yet.</p>
       ) : (
         <div className="products-grid">
-          {products.map(product => (
+          {products && products.map(product => (
             <div key={product.id} className="product-card">
               <div className="product-image">
                 <img src={product.image_url} alt={product.name} />

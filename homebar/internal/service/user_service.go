@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -11,12 +12,23 @@ import (
 )
 
 type UserService struct {
-	userRepo repository.UserRepository
+	userRepo     repository.UserRepository
+	customerRepo repository.CustomerRepository
+	merchantRepo repository.MerchantRepository
+	db           *sql.DB // For transactions
 }
 
-func NewUserService(userRepo repository.UserRepository) *UserService {
+func NewUserService(
+	userRepo repository.UserRepository,
+	customerRepo repository.CustomerRepository,
+	merchantRepo repository.MerchantRepository,
+	db *sql.DB,
+) *UserService {
 	return &UserService{
-		userRepo: userRepo,
+		userRepo:     userRepo,
+		customerRepo: customerRepo,
+		merchantRepo: merchantRepo,
+		db:           db,
 	}
 }
 
@@ -62,4 +74,48 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*domai
 	}
 
 	return user, nil
+}
+
+// RegisterCustomer creates a user with customer details
+func (s *UserService) RegisterCustomer(ctx context.Context, username, email, password string, customer *domain.Customer) (*domain.Customer, error) {
+	// This would ideally be a transaction
+	user, err := s.Register(ctx, username, email, password, domain.RoleCustomer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the UserID from the newly created user
+	customer.UserID = user.ID
+
+	// Create the customer record - we'd need a customerRepo for this
+	if err := s.customerRepo.Create(ctx, customer); err != nil {
+		// In a transaction, we would rollback here
+		// For now, we'll leave the user record as is
+		return nil, err
+	}
+
+	return customer, nil
+}
+
+// RegisterMerchant creates a user with merchant details
+func (s *UserService) RegisterMerchant(ctx context.Context, username, email, password string, merchant *domain.Merchant) (*domain.Merchant, error) {
+	// This would ideally be a transaction
+	user, err := s.Register(ctx, username, email, password, domain.RoleMerchant)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the UserID and timestamps from the newly created user
+	merchant.UserID = user.ID
+	merchant.CreatedAt = user.CreatedAt
+	merchant.UpdatedAt = user.UpdatedAt
+
+	// Create the merchant record - we'd need a merchantRepo for this
+	if err := s.merchantRepo.Create(ctx, merchant); err != nil {
+		// In a transaction, we would rollback here
+		// For now, we'll leave the user record as is
+		return nil, err
+	}
+
+	return merchant, nil
 }

@@ -67,6 +67,14 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity   INT NOT NULL,
   price      NUMERIC(10,2) NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS customers (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    address TEXT,
+    phone VARCHAR(50)
+);
   
 CREATE TABLE IF NOT EXISTS merchants (
   id            SERIAL PRIMARY KEY,

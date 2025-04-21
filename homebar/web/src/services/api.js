@@ -161,6 +161,44 @@ export const fetchWithAuth = async (url, options = {}) => {
   }
 };
 
+// Ingredient API methods
+export const ingredientAPI = {
+  getIngredients: (merchantId) => {
+    return apiClient.get(`/merchants/${merchantId}/inventory`);
+  },
+
+  getInventorySummary: (merchantId) => {
+    return apiClient.get(`/merchants/${merchantId}/inventory/summary`);
+  },
+
+  createIngredient: (merchantId, ingredientData) => {
+    return apiClient.post(`/merchants/${merchantId}/inventory`, ingredientData);
+  },
+
+  updateIngredient: (merchantId, ingredientId, updateData) => {
+    return apiClient.put(`/merchants/${merchantId}/inventory/${ingredientId}`, updateData);
+  },
+
+  deleteIngredient: (merchantId, ingredientId) => {
+    return apiClient.delete(`/merchants/${merchantId}/inventory/${ingredientId}`);
+  },
+};
+
+// Product Ingredient API methods
+export const productIngredientAPI = {
+  getProductIngredients: (productId) => {
+    return apiClient.get(`/products/${productId}/ingredients`);
+  },
+
+  addIngredientToProduct: (productId, ingredientData) => {
+    return apiClient.post(`/products/${productId}/ingredients`, ingredientData);
+  },
+
+  removeIngredientFromProduct: (productId, ingredientId) => {
+    return apiClient.delete(`/products/${productId}/ingredients/${ingredientId}`);
+  },
+};
+
 export default {
   auth: authAPI,
   products: productAPI,
@@ -168,4 +206,6 @@ export default {
   user: userAPI,
   cart: cartAPI,
   merchants: merchantAPI,
+  ingredients: ingredientAPI,
+  productIngredients: productIngredientAPI,
 };

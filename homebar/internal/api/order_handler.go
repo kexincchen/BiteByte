@@ -69,6 +69,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 		return
 	}
 	if midStr := c.Query("merchant"); midStr != "" {
+		fmt.Println("merchant midStr: ", midStr)
 		mid, _ := strconv.Atoi(midStr)
 		list, _ := h.svc.ListByMerchant(c, uint(mid))
 		c.JSON(http.StatusOK, list)

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/kexincchen/homebar/internal/domain"
@@ -49,4 +50,19 @@ func (s *ProductService) GetByMerchant(ctx context.Context, merchantID uint) ([]
 
 func (s *ProductService) GetAll(ctx context.Context) ([]*domain.Product, error) {
 	return s.productRepo.GetAll(ctx)
+}
+
+func (s *ProductService) GetProductByID(ctx context.Context, id interface{}) (*domain.Product, error) {
+	var productID uint
+	
+	switch v := id.(type) {
+	case uint:
+		productID = v
+	case int64:
+		productID = uint(v)
+	default:
+		return nil, fmt.Errorf("unsupported ID type")
+	}
+	
+	return s.productRepo.GetByID(ctx, productID)
 }

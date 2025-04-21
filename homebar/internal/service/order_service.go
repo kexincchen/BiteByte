@@ -4,18 +4,20 @@ import (
 	"context"
 	"time"
 
+	"errors"
+
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/repository"
 )
 
 type OrderService struct {
-	orderRepo     repository.OrderRepository
-	productRepo   repository.ProductRepository
-	inventoryRepo repository.InventoryRepository
+	orderRepo         repository.OrderRepository
+	productRepo       repository.ProductRepository
+	ingredientService *IngredientService
 }
 
-func NewOrderService(or repository.OrderRepository, pr repository.ProductRepository, ir repository.InventoryRepository) *OrderService {
-	return &OrderService{or, pr, ir}
+func NewOrderService(or repository.OrderRepository, pr repository.ProductRepository, ingredientService *IngredientService) *OrderService {
+	return &OrderService{or, pr, ingredientService}
 }
 
 type SimpleItem struct {
@@ -30,11 +32,6 @@ func (s *OrderService) CreateOrder(
 	items []SimpleItem,
 	notes string,
 ) (*domain.Order, error) {
-
-	if err := s.verifyInventory(ctx, merchantID, items); err != nil {
-		return nil, err
-	}
-
 	var (
 		total  float64
 		models []domain.OrderItem
@@ -67,12 +64,29 @@ func (s *OrderService) CreateOrder(
 		UpdatedAt:   now,
 	}
 
+	// Convert models to slice of pointers for HasSufficientInventoryForOrder
+	modelPtrs := make([]*domain.OrderItem, len(models))
+	for i := range models {
+		modelPtrs[i] = &models[i]
+	}
+
+	// Check if we have enough inventory for this order
+	hasInventory, err := s.ingredientService.HasSufficientInventoryForOrder(ctx, modelPtrs)
+	if err != nil {
+		return nil, err
+	}
+
+	if !hasInventory {
+		return nil, errors.New("insufficient ingredients inventory for this order")
+	}
+
 	if err := s.orderRepo.Create(ctx, order, models); err != nil {
 		return nil, err
 	}
-	if err := s.updateInventory(ctx, merchantID, items, order.ID); err != nil {
-		return nil, err
-	}
+
+	// The inventory is already updated by the HasSufficientInventoryForOrder method
+	// which locks and reduces the inventory when successful
+
 	return order, nil
 }
 
@@ -91,7 +105,6 @@ func (s *OrderService) ListByMerchant(ctx context.Context, mid uint) ([]*domain.
 func (s *OrderService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
 	return s.orderRepo.UpdateStatus(ctx, id, st)
 }
-
 func (s *OrderService) verifyInventory(
 	ctx context.Context,
 	merchantID uint,

@@ -15,6 +15,7 @@ import (
 	"github.com/kexincchen/homebar/internal/config"
 	"github.com/kexincchen/homebar/internal/db"
 	"github.com/kexincchen/homebar/internal/repository"
+	"github.com/kexincchen/homebar/internal/repository/postgres"
 	"github.com/kexincchen/homebar/internal/service"
 	//"time"
 )
@@ -39,12 +40,19 @@ func main() {
 	productRepo := repository.NewProductRepository(dbConn)
 	orderRepo := repository.NewOrderRepository(dbConn)
 	merchantRepo := repository.NewMerchantRepository(dbConn)
-	// inventoryRepo := repository.NewInventoryRepository(db)
+	ingredientRepo := postgres.NewIngredientRepository(dbConn)
+	productIngredientRepo := postgres.NewProductIngredientRepository(dbConn)
 
 	// Initialize services with all repositories
 	userService := service.NewUserService(userRepo, customerRepo, merchantRepo, dbConn)
 	productService := service.NewProductService(productRepo)
-	orderService := service.NewOrderService(orderRepo, productRepo, nil)
+	ingredientService := service.NewIngredientService(ingredientRepo)
+	productIngredientService := service.NewProductIngredientService(productIngredientRepo)
+	orderService := service.NewOrderService(
+		orderRepo,
+		productRepo,
+		ingredientService,
+	)
 	merchantService := service.NewMerchantService(merchantRepo)
 
 	// Initialize handlers
@@ -52,6 +60,12 @@ func main() {
 	productHandler := api.NewProductHandler(productService)
 	orderHandler := api.NewOrderHandler(orderService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
+	ingredientHandler := api.NewIngredientHandler(ingredientService)
+	productIngredientHandler := api.NewProductIngredientHandler(
+		productIngredientService,
+		productService,
+		ingredientService,
+	)
 
 	// Setup router
 	router := gin.Default()
@@ -99,6 +113,25 @@ func main() {
 			merchantRoutes.GET("/:id", merchantHandler.GetByID)
 			merchantRoutes.GET("/username/:username", merchantHandler.GetByUsername)
 			merchantRoutes.GET("/user/:userID", merchantHandler.GetByUserID)
+		}
+
+		// Ingredient routes
+		ingredientRoutes := apiRoutes.Group("/merchants/:id/inventory")
+		{
+			ingredientRoutes.GET("", ingredientHandler.GetAll)
+			ingredientRoutes.POST("", ingredientHandler.Create)
+			ingredientRoutes.GET("/summary", ingredientHandler.GetInventorySummary)
+			ingredientRoutes.GET("/:ingredientId", ingredientHandler.GetByID)
+			ingredientRoutes.PUT("/:ingredientId", ingredientHandler.Update)
+			ingredientRoutes.DELETE("/:ingredientId", ingredientHandler.Delete)
+		}
+
+		// Product ingredient routes
+		productIngredientRoutes := apiRoutes.Group("/products/:id/ingredients")		
+		{
+			productIngredientRoutes.GET("", productIngredientHandler.GetByProductID)
+			productIngredientRoutes.POST("", productIngredientHandler.Create)
+			productIngredientRoutes.DELETE("/:ingredientId", productIngredientHandler.Delete)
 		}
 	}
 

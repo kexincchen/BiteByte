@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
-import { orderAPI, productAPI } from "../../services/api";
+import { orderAPI, productAPI, ingredientAPI } from "../../services/api";
 import { AuthContext } from "../../contexts/AuthContext";
 
 const Dashboard = () => {
@@ -26,6 +26,7 @@ const Dashboard = () => {
         console.log("Current user: ", currentUser);
 
         if (currentUser.merchant_id) {
+          console.log("Fetching merchant data for merchant_id: ", currentUser.merchant_id);
           // If merchant_id exists, use it directly
           await fetchMerchantData(currentUser.merchant_id);
         } else {
@@ -100,17 +101,11 @@ const Dashboard = () => {
 
         // Get ingredient inventory stats
         try {
-          const inventoryResponse = await fetch(
-            `/api/merchants/${merchantId}/inventory/summary`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          );
-
+          const inventoryResponse = await ingredientAPI.getInventorySummary(merchantId);
+          console.log("Inventory response: ", inventoryResponse);
           if (inventoryResponse.ok) {
             const inventoryData = await inventoryResponse.json();
+            console.log("Inventory response: ", inventoryData);
             setIngredientStats({
               total: inventoryData.totalIngredients || 0,
               lowStock: inventoryData.lowStockCount || 0,

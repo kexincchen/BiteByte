@@ -74,8 +74,11 @@ export const orderAPI = {
   updateOrderStatus: (id, status) => {
     return apiClient.patch(`/orders/${id}/status`, { status });
   },
-  getOrdersByUser: (userId, role) => {
-    return apiClient.get(`/orders/user/${userId}?role=${role}`);
+  getOrdersByMerchant: (merchantId) => {
+    return apiClient.get(`/orders?merchant=${merchantId}`);
+  },
+  getOrdersByCustomer: (customerId) => {
+    return apiClient.get(`/orders?customer=${customerId}`);
   },
 };
 

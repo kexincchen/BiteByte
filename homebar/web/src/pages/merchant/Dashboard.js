@@ -9,6 +9,10 @@ const Dashboard = () => {
   const [productCount, setProductCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [ingredientStats, setIngredientStats] = useState({
+    total: 0,
+    lowStock: 0,
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -77,7 +81,7 @@ const Dashboard = () => {
     const fetchMerchantData = async (merchantId) => {
       try {
         // Get orders
-        const ordersResponse = await orderAPI.getOrdersByUser(currentUser.id, "merchant");
+        const ordersResponse = await orderAPI.getOrdersByMerchant(merchantId);
         setRecentOrders(
           Array.isArray(ordersResponse.data)
             ? ordersResponse.data.slice(0, 5)
@@ -93,6 +97,29 @@ const Dashboard = () => {
             ? productsResponse.data.length
             : 0
         );
+
+        // Get ingredient inventory stats
+        try {
+          const inventoryResponse = await fetch(
+            `/api/merchants/${merchantId}/inventory/summary`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+
+          if (inventoryResponse.ok) {
+            const inventoryData = await inventoryResponse.json();
+            setIngredientStats({
+              total: inventoryData.totalIngredients || 0,
+              lowStock: inventoryData.lowStockCount || 0,
+            });
+          }
+        } catch (inventoryError) {
+          console.error("Error fetching inventory data:", inventoryError);
+          // Don't fail the entire dashboard if just inventory fails
+        }
 
         setLoading(false);
       } catch (error) {
@@ -128,13 +155,25 @@ const Dashboard = () => {
           </Link>
         </div>
         <div className="stat-card">
+          <h3>Ingredients</h3>
+          <p className="stat-number">{ingredientStats.total}</p>
+          {ingredientStats.lowStock > 0 && (
+            <p className="warning-text">
+              {ingredientStats.lowStock} ingredients low on stock
+            </p>
+          )}
+          <Link to="/merchant/inventory" className="action-link">
+            Manage Inventory
+          </Link>
+        </div>
+        <div className="stat-card">
           <h3>Quick Actions</h3>
           <div className="action-buttons">
             <Link to="/merchant/products/new" className="action-button">
               Add Product
             </Link>
-            <Link to="/merchant/inventory" className="action-button">
-              Manage Inventory
+            <Link to="/merchant/inventory/add" className="action-button">
+              Add Ingredients
             </Link>
           </div>
         </div>

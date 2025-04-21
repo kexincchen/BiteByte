@@ -103,6 +103,8 @@ func main() {
 			orderRoutes.POST("", orderHandler.Create)
 			orderRoutes.GET("", orderHandler.List)
 			orderRoutes.GET("/:id", orderHandler.GetByID)
+			orderRoutes.PUT("/:id/status", orderHandler.UpdateStatus)
+			orderRoutes.PUT("/:id", orderHandler.UpdateOrder)
 		}
 
 		// Merchant routes

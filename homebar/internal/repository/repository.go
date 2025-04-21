@@ -52,7 +52,9 @@ type OrderRepository interface {
 	GetByCustomer(ctx context.Context, customerID uint) ([]*domain.Order, error)
 	GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Order, error)
 	UpdateStatus(ctx context.Context, orderID uint, status domain.OrderStatus) error
+	UpdateOrder(ctx context.Context, o *domain.Order) error
 }
+
 type InventoryRepository interface {
 	GetByMerchantAndIngredient(ctx context.Context, merchantID, ingredientID uint) (*domain.Inventory, error)
 	UpdateQuantity(ctx context.Context, inventoryID uint, quantityChange float64) error

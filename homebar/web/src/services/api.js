@@ -72,7 +72,10 @@ export const orderAPI = {
     return apiClient.get(`/orders/${id}`);
   },
   updateOrderStatus: (id, status) => {
-    return apiClient.patch(`/orders/${id}/status`, { status });
+    return apiClient.put(`/orders/${id}/status`, { status });
+  },
+  updateOrder: (id, orderData) => {
+    return apiClient.put(`/orders/${id}`, orderData);
   },
   getOrdersByMerchant: (merchantId) => {
     return apiClient.get(`/orders?merchant=${merchantId}`);
@@ -206,10 +209,9 @@ export const productIngredientAPI = {
   },
 
   updateProductIngredient: (productId, ingredientId, quantity) => {
-    return apiClient.put(
-      `/products/${productId}/ingredients/${ingredientId}`,
-      { quantity }
-    );
+    return apiClient.put(`/products/${productId}/ingredients/${ingredientId}`, {
+      quantity,
+    });
   },
 };
 

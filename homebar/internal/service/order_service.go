@@ -105,6 +105,27 @@ func (s *OrderService) ListByMerchant(ctx context.Context, mid uint) ([]*domain.
 func (s *OrderService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
 	return s.orderRepo.UpdateStatus(ctx, id, st)
 }
+
+func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, notes string) error {
+	// Get the existing order
+	order, _, err := s.orderRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Update fields that are provided
+	if status != "" {
+		order.Status = domain.OrderStatus(status)
+	}
+
+	if notes != "" {
+		order.Notes = notes
+	}
+
+	// Update the order in the database
+	return s.orderRepo.UpdateOrder(ctx, order)
+}
+
 func (s *OrderService) verifyInventory(
 	ctx context.Context,
 	merchantID uint,

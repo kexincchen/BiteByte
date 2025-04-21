@@ -76,6 +76,8 @@ func (r *ProductIngredientRepository) GetProductIngredients(ctx context.Context,
 			ProductID:    ing.ProductID,
 			IngredientID: ing.IngredientID,
 			Quantity:     ing.Quantity,
+			IngredientName: ing.Name,
+			IngredientUnit: ing.Unit,
 		})
 	}
 

@@ -153,11 +153,6 @@ const ProductForm = ({ isEditing = false }) => {
             parseInt(item.ingredient_id),
             parseFloat(item.quantity)
           )
-          // await productIngredientAPI.updateProductIngredient({
-          //   product_id: parseInt(productId),
-          //   ingredient_id: parseInt(item.ingredient_id),
-          //   quantity: parseFloat(item.quantity),
-          // });
         }
       } else {
         // Add ingredients to the new product
@@ -189,9 +184,9 @@ const ProductForm = ({ isEditing = false }) => {
     if (ingredient) {
       const newIngredient = {
         ingredient_id: ingredient.id,
-        name: ingredient.name,
+        ingredient_name: ingredient.name,
+        ingredient_unit: ingredient.unit,
         quantity: parseFloat(quantity),
-        unit: ingredient.unit,
       };
 
       setProductIngredients([...productIngredients, newIngredient]);
@@ -373,7 +368,7 @@ const ProductForm = ({ isEditing = false }) => {
                 ) : (
                   productIngredients.map((item) => (
                     <tr key={item.ingredient_id}>
-                      <td>{item.name}</td>
+                      <td>{item.ingredient_name}</td>
                       <td>
                         <input
                           type="number"
@@ -389,7 +384,7 @@ const ProductForm = ({ isEditing = false }) => {
                           min="0.1"
                         />
                       </td>
-                      <td>{item.unit}</td>
+                      <td>{item.ingredient_unit}</td>
                       <td>
                         <button
                           type="button"

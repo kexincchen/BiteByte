@@ -56,7 +56,7 @@ func (h *ProductIngredientHandler) GetByProductID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving product ingredients"})
 		return
 	}
-
+	
 	c.JSON(http.StatusOK, ingredients)
 }
 

@@ -131,6 +131,7 @@ func main() {
 		{
 			productIngredientRoutes.GET("", productIngredientHandler.GetByProductID)
 			productIngredientRoutes.POST("", productIngredientHandler.Create)
+			productIngredientRoutes.PUT("/:ingredientId", productIngredientHandler.Update)
 			productIngredientRoutes.DELETE("/:ingredientId", productIngredientHandler.Delete)
 		}
 	}

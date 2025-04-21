@@ -30,6 +30,7 @@ func (r *ProductIngredientRepository) AddIngredientToProduct(ctx context.Context
 	return err
 }
 
+
 // RemoveIngredientFromProduct removes an ingredient from a product
 func (r *ProductIngredientRepository) RemoveIngredientFromProduct(ctx context.Context, productID, ingredientID int64) error {
 	query := `DELETE FROM product_ingredients WHERE product_id = $1 AND ingredient_id = $2`

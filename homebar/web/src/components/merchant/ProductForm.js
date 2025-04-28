@@ -13,7 +13,7 @@ const ProductForm = ({ isEditing = false }) => {
     description: '',
     price: '',
     category: '',
-    image_url: '',
+    file: null,
     is_available: true
   });
   
@@ -74,6 +74,11 @@ const ProductForm = ({ isEditing = false }) => {
     }));
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setFormData(prev => ({ ...prev, file }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -87,16 +92,18 @@ const ProductForm = ({ isEditing = false }) => {
 
     try {
       // Format the data for submission
-      const productData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        merchant_id: currentUser.merchant_id
-      };
-
+      const multipart = new FormData();
+      multipart.append('name',        formData.name);
+      multipart.append('description', formData.description);
+      multipart.append('price',       formData.price);
+      multipart.append('category',    formData.category);
+      multipart.append('is_available',formData.is_available);
+      multipart.append('merchant_id', currentUser.merchant_id);
+      if (formData.file) multipart.append('image', formData.file);
       if (isEditing) {
-        await productAPI.updateProduct(id, productData);
+        await productAPI.updateProduct(id, multipart);
       } else {
-        await productAPI.createProduct(productData);
+        await productAPI.createProduct(multipart);
       }
 
       navigate('/merchant/products');
@@ -172,21 +179,22 @@ const ProductForm = ({ isEditing = false }) => {
             </select>
           </div>
         </div>
-        
+
         <div className="form-group">
-          <label htmlFor="image_url">Image URL</label>
+          <label htmlFor="image">Image (jpg/png)</label>
           <input
-            type="text"
-            id="image_url"
-            name="image_url"
-            value={formData.image_url}
-            onChange={handleChange}
-            placeholder="https://example.com/image.jpg"
+            type="file"
+            id="image"
+            accept="image/png, image/jpeg"
+            onChange={handleFileChange}
           />
-          {formData.image_url && (
-            <div className="image-preview">
-              <img src={formData.image_url} alt="Product preview" />
-            </div>
+          {formData.file && (
+              <div className="image-preview">
+                <img src={URL.createObjectURL(formData.file)}
+                  alt="preview"
+                  style={{ maxWidth: 200 }}
+                />
+              </div>
           )}
         </div>
         

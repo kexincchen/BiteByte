@@ -95,6 +95,7 @@ func main() {
 			productRoutes.DELETE("/:id", productHandler.Delete)
 			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
 			productRoutes.GET("", productHandler.GetAll)
+			productRoutes.GET("/:id/image", productHandler.GetImage)
 		}
 
 		// Order routes
@@ -127,7 +128,7 @@ func main() {
 		}
 
 		// Product ingredient routes
-		productIngredientRoutes := apiRoutes.Group("/products/:id/ingredients")		
+		productIngredientRoutes := apiRoutes.Group("/products/:id/ingredients")
 		{
 			productIngredientRoutes.GET("", productIngredientHandler.GetByProductID)
 			productIngredientRoutes.POST("", productIngredientHandler.Create)

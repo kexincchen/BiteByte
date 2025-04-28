@@ -6,9 +6,6 @@ const API_URL = "http://localhost:8080/api";
 // Create an axios instance with default config
 const apiClient = axios.create({
   baseURL: API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Add a request interceptor to attach the auth token to every request

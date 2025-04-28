@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT,
   price NUMERIC(10,2) NOT NULL,
   category TEXT,
-  image_url TEXT,
+  mime_type TEXT,
+  image_data BYTEA,
   is_available BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL

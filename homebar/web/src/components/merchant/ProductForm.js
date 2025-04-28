@@ -11,12 +11,12 @@ const ProductForm = ({ isEditing = false }) => {
   const { id } = useParams();
 
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    category: "",
-    image_url: "",
-    is_available: true,
+    name: '',
+    description: '',
+    price: '',
+    category: '',
+    file: null,
+    is_available: true
   });
 
   const [loading, setLoading] = useState(isEditing);
@@ -115,6 +115,11 @@ const ProductForm = ({ isEditing = false }) => {
     }));
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setFormData(prev => ({ ...prev, file }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -128,40 +133,19 @@ const ProductForm = ({ isEditing = false }) => {
 
     try {
       // Format the data for submission
-      const productData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        merchant_id: currentUser.merchant_id,
-      };
-
-      let productId;
-
+      const multipart = new FormData();
+      multipart.append('name',        formData.name);
+      multipart.append('description', formData.description);
+      multipart.append('price',       formData.price);
+      multipart.append('category',    formData.category);
+      multipart.append('is_available',formData.is_available);
+      multipart.append('merchant_id', currentUser.merchant_id);
+      if (formData.file) multipart.append('image', formData.file);
       if (isEditing) {
-        await productAPI.updateProduct(id, productData);
-        productId = id;
+        await productAPI.updateProduct(id, multipart);
       } else {
-        const response = await productAPI.createProduct(productData);
-        productId = response.data.id;
-      }
+        await productAPI.createProduct(multipart);
 
-      // Handle ingredient relationships
-      if (isEditing) {
-        // Update existing product ingredients
-        for (const item of productIngredients) {
-          await productIngredientAPI.updateProductIngredient(
-            parseInt(id),
-            parseInt(item.ingredient_id),
-            parseFloat(item.quantity)
-          )
-        }
-      } else {
-        // Add ingredients to the new product
-        for (const item of productIngredients) {
-          await productIngredientAPI.addIngredientToProduct(productId, {
-            ingredient_id: parseInt(item.ingredient_id),
-            quantity: parseFloat(item.quantity),
-          });
-        }
       }
 
       navigate("/merchant/products");
@@ -317,19 +301,20 @@ const ProductForm = ({ isEditing = false }) => {
         </div>
 
         <div className="form-group">
-          <label htmlFor="image_url">Image URL</label>
+          <label htmlFor="image">Image (jpg/png)</label>
           <input
-            type="text"
-            id="image_url"
-            name="image_url"
-            value={formData.image_url}
-            onChange={handleChange}
-            placeholder="https://example.com/image.jpg"
+            type="file"
+            id="image"
+            accept="image/png, image/jpeg"
+            onChange={handleFileChange}
           />
-          {formData.image_url && (
-            <div className="image-preview">
-              <img src={formData.image_url} alt="Product preview" />
-            </div>
+          {formData.file && (
+              <div className="image-preview">
+                <img src={URL.createObjectURL(formData.file)}
+                  alt="preview"
+                  style={{ maxWidth: 200 }}
+                />
+              </div>
           )}
         </div>
 
@@ -469,4 +454,4 @@ const ProductForm = ({ isEditing = false }) => {
   );
 };
 
-export default ProductForm;
+export default ProductForm; 

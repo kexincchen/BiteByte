@@ -19,26 +19,26 @@ func NewProductRepository(db *sql.DB) *ProductRepo { return &ProductRepo{db: db}
 
 func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	const q = `INSERT INTO products
-		(merchant_id, name, description, price, category, image_url, is_available,
+		(merchant_id, name, description, price, category, mime_type, image_data, is_available,
 		 created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		RETURNING id`
 
 	return r.db.QueryRowContext(ctx, q,
 		p.MerchantID, p.Name, p.Description, p.Price, p.Category,
-		p.ImageURL, p.IsAvailable, p.CreatedAt, p.UpdatedAt,
+		p.MimeType, p.ImageData, p.IsAvailable, p.CreatedAt, p.UpdatedAt,
 	).Scan(&p.ID)
 }
 
 func (r *ProductRepo) GetByID(ctx context.Context, id uint) (*domain.Product, error) {
 	const q = `SELECT id, merchant_id, name, description, price, category,
-			   image_url, is_available, created_at, updated_at
+			   mime_type, image_data, is_available, created_at, updated_at
 			   FROM products WHERE id=$1`
 
 	var p domain.Product
 	err := r.db.QueryRowContext(ctx, q, id).Scan(
 		&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Category,
-		&p.ImageURL, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
+		&p.MimeType, &p.ImageData, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -47,14 +47,34 @@ func (r *ProductRepo) GetByID(ctx context.Context, id uint) (*domain.Product, er
 }
 
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
-	const q = `UPDATE products
-			   SET name=$1, description=$2, price=$3, category=$4,
-				   image_url=$5, is_available=$6, updated_at=$7
-			   WHERE id=$8`
-	res, err := r.db.ExecContext(ctx, q,
-		p.Name, p.Description, p.Price, p.Category,
-		p.ImageURL, p.IsAvailable, p.UpdatedAt, p.ID,
+	var (
+		q    string
+		args []interface{}
 	)
+
+	if len(p.ImageData) == 0 {
+		// No new image uploaded: don't update mime_type and image_data
+		q = `UPDATE products
+			     SET name=$1, description=$2, price=$3, category=$4,
+			         is_available=$5, updated_at=$6
+			     WHERE id=$7`
+		args = []interface{}{
+			p.Name, p.Description, p.Price, p.Category,
+			p.IsAvailable, p.UpdatedAt, p.ID,
+		}
+	} else {
+		// New image uploaded: update mime_type and image_data
+		q = `UPDATE products
+			     SET name=$1, description=$2, price=$3, category=$4,
+			         mime_type=$5, image_data=$6, is_available=$7, updated_at=$8
+			     WHERE id=$9`
+		args = []interface{}{
+			p.Name, p.Description, p.Price, p.Category,
+			p.MimeType, p.ImageData, p.IsAvailable, p.UpdatedAt, p.ID,
+		}
+	}
+
+	res, err := r.db.ExecContext(ctx, q, args...)
 	if err != nil {
 		return err
 	}
@@ -77,7 +97,7 @@ func (r *ProductRepo) Delete(ctx context.Context, id uint) error {
 
 func (r *ProductRepo) GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Product, error) {
 	q := `SELECT id, merchant_id, name, description, price, category,
-		  image_url, is_available, created_at, updated_at
+		  mime_type, image_data, is_available, created_at, updated_at
 		  FROM products`
 	var rows *sql.Rows
 	var err error
@@ -87,14 +107,18 @@ func (r *ProductRepo) GetByMerchant(ctx context.Context, merchantID uint) ([]*do
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+		}
+	}(rows)
 
 	var list []*domain.Product
 	for rows.Next() {
 		var p domain.Product
 		if err := rows.Scan(
 			&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Category,
-			&p.ImageURL, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
+			&p.MimeType, &p.ImageData, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -105,21 +129,25 @@ func (r *ProductRepo) GetByMerchant(ctx context.Context, merchantID uint) ([]*do
 
 func (r *ProductRepo) GetAll(ctx context.Context) ([]*domain.Product, error) {
 	const q = `SELECT id, merchant_id, name, description, price, category,
-	           image_url, is_available, created_at, updated_at
+	           mime_type, image_data, is_available, created_at, updated_at
 	           FROM products`
 
 	rows, err := r.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+		}
+	}(rows)
 
 	var list []*domain.Product
 	for rows.Next() {
 		var p domain.Product
 		if err := rows.Scan(
 			&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Category,
-			&p.ImageURL, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
+			&p.MimeType, &p.ImageData, &p.IsAvailable, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

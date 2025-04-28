@@ -42,7 +42,13 @@ const ProductDetail = () => {
     <div className="product-detail-page">
       <div className="product-detail-container">
         <div className="product-image-container">
-          <img src={product.image_url} alt={product.name} />
+          <img
+              src={`http://localhost:8080/api/products/${product.id}/image`}
+              alt={product.name}
+              onError={(e) => {
+                e.target.src = '/placeholder.png'
+              }}
+          />
         </div>
         
         <div className="product-info">
@@ -91,4 +97,4 @@ const ProductDetail = () => {
   );
 };
 
-export default ProductDetail; 
+export default ProductDetail;

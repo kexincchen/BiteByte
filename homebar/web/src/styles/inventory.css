@@ -1,0 +1,171 @@
+/* Inventory management styles */
+.inventory-page {
+  padding: 20px;
+}
+
+.inventory-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.search-box {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 250px;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+}
+
+.sort-select {
+  margin-right: 10px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.sort-direction {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.inventory-table th {
+  background-color: #f8f8f8;
+  font-weight: bold;
+}
+
+.quantity-input {
+  width: 80px;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.status-ok {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-low {
+  background-color: #fff8e1;
+  color: #ff8f00;
+}
+
+.action-link {
+  color: #1976d2;
+  text-decoration: none;
+}
+
+.action-link:hover {
+  text-decoration: underline;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+/* Add ingredient form styles */
+.add-ingredient-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.ingredient-form {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+}
+
+.button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.button.primary {
+  background-color: #1976d2;
+  color: white;
+}
+
+.button.secondary {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.button.danger {
+  background-color: #f44336;
+  color: white;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+} 

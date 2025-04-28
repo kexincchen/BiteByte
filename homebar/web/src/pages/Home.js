@@ -10,7 +10,8 @@ const Home = () => {
     const fetchMerchants = async () => {
       try {
         const response = await merchantAPI.getMerchants();
-        setMerchants(response.data);
+        // Ensure we have an array, even if response.data is null or undefined
+        setMerchants(response.data || []);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching merchants:', error);

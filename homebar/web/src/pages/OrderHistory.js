@@ -1,28 +1,32 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
-import { orderAPI } from '../services/api';
-import { AuthContext } from '../contexts/AuthContext';
+import React, { useState, useEffect, useContext } from "react";
+import { Link } from "react-router-dom";
+import { orderAPI } from "../services/api";
+import { AuthContext } from "../contexts/AuthContext";
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const { currentUser } = useContext(AuthContext);
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!currentUser) {
+      console.log("Current user: ", currentUser);
+      if (!currentUser || !currentUser.id) {
         setLoading(false);
         return;
       }
 
       try {
-        const response = await orderAPI.getOrders();
-        setOrders(response.data);
+        const response = await orderAPI.getOrdersByCustomer(
+          currentUser.id
+        );
+        console.log("Orders: ", response);
+        setOrders(Array.isArray(response.data) ? response.data : []);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching orders:', error);
-        setError('Failed to load your orders');
+        console.error("Error fetching orders:", error);
+        setError("Failed to load your orders");
         setLoading(false);
       }
     };
@@ -38,9 +42,9 @@ const OrderHistory = () => {
   return (
     <div className="order-history-page">
       <h1>Your Orders</h1>
-      
+
       <div className="orders-list">
-        {orders.map(order => (
+        {orders.map((order) => (
           <div key={order.id} className="order-card">
             <div className="order-header">
               <div className="order-id">
@@ -53,13 +57,17 @@ const OrderHistory = () => {
                 {new Date(order.created_at).toLocaleDateString()}
               </div>
             </div>
-            
+
             <div className="order-details">
               <div className="order-total">
                 Total: ${order.total_amount.toFixed(2)}
               </div>
-              
-              <Link to={`/orders/${order.id}`} className="view-order-button">
+
+              <Link
+                to={`/orders/${order.id}`}
+                state={{ order }}
+                className="view-order-button"
+              >
                 View Details
               </Link>
             </div>
@@ -70,4 +78,4 @@ const OrderHistory = () => {
   );
 };
 
-export default OrderHistory; 
+export default OrderHistory;

@@ -4,89 +4,120 @@ import (
 	"context"
 	"time"
 
+	"errors"
+
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/repository"
 )
 
 type OrderService struct {
-	orderRepo     repository.OrderRepository
-	productRepo   repository.ProductRepository
-	inventoryRepo repository.InventoryRepository
+	orderRepo         repository.OrderRepository
+	productRepo       repository.ProductRepository
+	ingredientService *IngredientService
 }
 
-func NewOrderService(
-	orderRepo repository.OrderRepository,
-	productRepo repository.ProductRepository,
-	inventoryRepo repository.InventoryRepository,
-) *OrderService {
-	return &OrderService{
-		orderRepo:     orderRepo,
-		productRepo:   productRepo,
-		inventoryRepo: inventoryRepo,
-	}
+func NewOrderService(or repository.OrderRepository, pr repository.ProductRepository, ingredientService *IngredientService) *OrderService {
+	return &OrderService{or, pr, ingredientService}
 }
 
-func (s *OrderService) CreateOrder(ctx context.Context, customerID uint, merchantID uint,
-	items []struct {
-		ProductID uint
-		Quantity  int
-	}, notes string) (*domain.Order, error) {
+type SimpleItem struct {
+	ProductID uint
+	Quantity  int
+	Price     float64
+}
 
-	// Verify inventory before creating order
-	if err := s.verifyInventory(ctx, merchantID, items); err != nil {
-		return nil, err
-	}
-
-	// Calculate total amount
-	var totalAmount float64
-	for _, item := range items {
-		product, err := s.productRepo.GetByID(ctx, item.ProductID)
-		if err != nil {
-			return nil, err
+func (s *OrderService) CreateOrder(
+	ctx context.Context,
+	customerID, merchantID uint,
+	items []SimpleItem,
+	notes string,
+) (*domain.Order, error) {
+	var (
+		total  float64
+		models []domain.OrderItem
+	)
+	for _, it := range items {
+		price := it.Price
+		if price == 0 {
+			p, err := s.productRepo.GetByID(ctx, it.ProductID)
+			if err != nil {
+				return nil, err
+			}
+			price = p.Price
 		}
-		totalAmount += product.Price * float64(item.Quantity)
+		total += price * float64(it.Quantity)
+		models = append(models, domain.OrderItem{
+			ProductID: it.ProductID,
+			Quantity:  it.Quantity,
+			Price:     price,
+		})
 	}
 
-	// Create order
 	now := time.Now()
 	order := &domain.Order{
 		CustomerID:  customerID,
 		MerchantID:  merchantID,
-		TotalAmount: totalAmount,
+		TotalAmount: total,
 		Status:      domain.OrderStatusPending,
 		Notes:       notes,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 
-	if err := s.orderRepo.Create(ctx, order); err != nil {
+	// Convert models to slice of pointers for HasSufficientInventoryForOrder
+	modelPtrs := make([]*domain.OrderItem, len(models))
+	for i := range models {
+		modelPtrs[i] = &models[i]
+	}
+
+	// Check if we have enough inventory for this order
+	hasInventory, err := s.ingredientService.HasSufficientInventoryForOrder(ctx, modelPtrs)
+	if err != nil {
 		return nil, err
 	}
 
-	// Update inventory
-	// This would be better in a transaction
-	if err := s.updateInventory(ctx, merchantID, items, order.ID); err != nil {
-		// Should rollback the order creation here in a real implementation
+	if !hasInventory {
+		return nil, errors.New("insufficient ingredients inventory for this order")
+	}
+
+	if err := s.orderRepo.Create(ctx, order, models); err != nil {
 		return nil, err
 	}
+
+	// The inventory is already updated by the HasSufficientInventoryForOrder method
+	// which locks and reduces the inventory when successful
 
 	return order, nil
 }
 
-func (s *OrderService) verifyInventory(ctx context.Context, merchantID uint,
-	items []struct {
-		ProductID uint
-		Quantity  int
-	}) error {
-	// Implementation would check if there are enough ingredients for all products
+func (s *OrderService) GetByID(ctx context.Context, id uint) (*domain.Order, []domain.OrderItem, error) {
+	return s.orderRepo.GetByID(ctx, id)
+}
+
+func (s *OrderService) ListByCustomer(ctx context.Context, cid uint) ([]*domain.Order, error) {
+	return s.orderRepo.GetByCustomer(ctx, cid)
+}
+
+func (s *OrderService) ListByMerchant(ctx context.Context, mid uint) ([]*domain.Order, error) {
+	return s.orderRepo.GetByMerchant(ctx, mid)
+}
+
+func (s *OrderService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
+	return s.orderRepo.UpdateStatus(ctx, id, st)
+}
+func (s *OrderService) verifyInventory(
+	ctx context.Context,
+	merchantID uint,
+	items []SimpleItem,
+) error {
 	return nil
 }
 
-func (s *OrderService) updateInventory(ctx context.Context, merchantID uint,
-	items []struct {
-		ProductID uint
-		Quantity  int
-	}, orderID uint) error {
-	// Implementation would reduce inventory quantities based on order items
+func (s *OrderService) updateInventory(
+	ctx context.Context,
+	merchantID uint,
+	items []SimpleItem,
+	orderID uint,
+) error {
 	return nil
 }

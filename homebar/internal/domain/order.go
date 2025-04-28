@@ -7,13 +7,13 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusPending     OrderStatus = "pending"
-	OrderStatusConfirmed   OrderStatus = "confirmed"
-	OrderStatusPreparing   OrderStatus = "preparing"
-	OrderStatusReady       OrderStatus = "ready"
-	OrderStatusDelivered   OrderStatus = "delivered"
-	OrderStatusCancelled   OrderStatus = "cancelled"
-	OrderStatusRefunded    OrderStatus = "refunded"
+	OrderStatusPending   OrderStatus = "pending"
+	OrderStatusConfirmed OrderStatus = "confirmed"
+	OrderStatusPreparing OrderStatus = "preparing"
+	OrderStatusReady     OrderStatus = "ready"
+	OrderStatusDelivered OrderStatus = "delivered"
+	OrderStatusCancelled OrderStatus = "cancelled"
+	OrderStatusRefunded  OrderStatus = "refunded"
 )
 
 type Order struct {
@@ -33,5 +33,5 @@ type OrderItem struct {
 	OrderID   uint    `json:"order_id"`
 	ProductID uint    `json:"product_id"`
 	Quantity  int     `json:"quantity"`
-	Price     float64 `json:"price"` // Price at the time of order
-} 
+	Price     float64 `json:"price"`
+}

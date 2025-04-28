@@ -15,9 +15,9 @@ type Inventory struct {
 type InventoryTransaction struct {
 	ID           uint      `json:"id"`
 	InventoryID  uint      `json:"inventory_id"`
-	OrderID      *uint     `json:"order_id"` // Optional, can be null for manual adjustments
-	Quantity     float64   `json:"quantity"` // Can be negative for deductions
-	Reason       string    `json:"reason"`   // e.g., "order", "restock", "adjustment"
-	PerformedBy  uint      `json:"performed_by"` // User ID
+	OrderID      *uint     `json:"order_id"`
+	Quantity     float64   `json:"quantity"`
+	Reason       string    `json:"reason"`
+	PerformedBy  uint      `json:"performed_by"`
 	TransactedAt time.Time `json:"transacted_at"`
-} 
+}

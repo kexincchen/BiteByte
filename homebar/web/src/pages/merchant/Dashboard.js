@@ -13,6 +13,9 @@ const Dashboard = () => {
     total: 0,
     lowStock: 0,
   });
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -26,7 +29,10 @@ const Dashboard = () => {
         console.log("Current user: ", currentUser);
 
         if (currentUser.merchant_id) {
-          console.log("Fetching merchant data for merchant_id: ", currentUser.merchant_id);
+          console.log(
+            "Fetching merchant data for merchant_id: ",
+            currentUser.merchant_id
+          );
           // If merchant_id exists, use it directly
           await fetchMerchantData(currentUser.merchant_id);
         } else {
@@ -101,7 +107,9 @@ const Dashboard = () => {
 
         // Get ingredient inventory stats
         try {
-          const inventoryResponse = await ingredientAPI.getInventorySummary(merchantId);
+          const inventoryResponse = await ingredientAPI.getInventorySummary(
+            merchantId
+          );
           console.log("Inventory response: ", inventoryResponse);
           if (inventoryResponse.ok) {
             const inventoryData = await inventoryResponse.json();
@@ -126,6 +134,64 @@ const Dashboard = () => {
 
     fetchDashboardData();
   }, [currentUser, updateCurrentUser]);
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    setUpdatingStatus(true);
+    try {
+      const response = await orderAPI.updateOrderStatus(orderId, newStatus);
+      console.log("Response: ", response);
+      if (response.status >= 200 && response.status < 300) {
+        // Update the local state to reflect the change
+        setRecentOrders(
+          recentOrders.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+      } else {
+        throw new Error("Failed to update order status");
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      setError(
+        "Failed to update order status: " + (error.message || "Unknown error")
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const openOrderModal = (order) => {
+    setSelectedOrder(order);
+    setShowOrderModal(true);
+  };
+
+  const closeOrderModal = () => {
+    setSelectedOrder(null);
+    setShowOrderModal(false);
+  };
+
+  const updateOrder = async (updatedOrder) => {
+    try {
+      const response = await orderAPI.updateOrder(
+        updatedOrder.id,
+        updatedOrder
+      );
+      if (response.status >= 200 && response.status < 300) {
+        // Update the local state with the updated order
+        setRecentOrders(
+          recentOrders.map((order) =>
+            order.id === updatedOrder.id ? updatedOrder : order
+          )
+        );
+        closeOrderModal();
+      } else {
+        throw new Error("Failed to update order");
+      }
+    } catch (error) {
+      console.error("Error updating order:", error);
+      setError("Failed to update order: " + (error.message || "Unknown error"));
+    }
+  };
 
   if (loading) return <div>Loading dashboard...</div>;
   if (error) return <div className="error">{error}</div>;
@@ -197,13 +263,31 @@ const Dashboard = () => {
                   <td>Customer #{order.customer_id}</td>
                   <td>{new Date(order.created_at).toLocaleDateString()}</td>
                   <td>
-                    <span className={`status-badge status-${order.status}`}>
-                      {order.status}
-                    </span>
+                    <select
+                      className={`status-select status-${order.status}`}
+                      value={order.status}
+                      onChange={(e) =>
+                        handleStatusChange(order.id, e.target.value)
+                      }
+                      disabled={updatingStatus}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="preparing">Preparing</option>
+                      <option value="ready">Ready</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
                   </td>
                   <td>${order.total_amount.toFixed(2)}</td>
                   <td>
-                    <Link to={`/merchant/orders/${order.id}`}>Edit</Link>
+                    <button
+                      className="edit-button"
+                      onClick={() => openOrderModal(order)}
+                    >
+                      Edit
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -211,7 +295,92 @@ const Dashboard = () => {
           </table>
         )}
       </div>
+
+      {showOrderModal && selectedOrder && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Edit Order #{selectedOrder.id}</h3>
+            <OrderEditForm
+              order={selectedOrder}
+              onSubmit={updateOrder}
+              onCancel={closeOrderModal}
+            />
+          </div>
+        </div>
+      )}
     </div>
+  );
+};
+
+const OrderEditForm = ({ order, onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState({
+    ...order,
+    notes: order.notes || "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="order-edit-form">
+      <div className="form-group">
+        <label>Status:</label>
+        <select
+          name="status"
+          value={formData.status}
+          onChange={handleChange}
+          className={`status-select status-${formData.status}`}
+        >
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="preparing">Preparing</option>
+          <option value="ready">Ready</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="refunded">Refunded</option>
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label>Notes:</label>
+        <textarea
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          rows="4"
+          placeholder="Add notes about this order..."
+        ></textarea>
+      </div>
+
+      {/* <div className="form-group">
+        <label>Delivery Date/Time:</label>
+        <input
+          type="datetime-local"
+          name="delivery_time"
+          value={formData.delivery_time || ""}
+          onChange={handleChange}
+        />
+      </div> */}
+
+      <div className="form-actions">
+        <button type="submit" className="btn-primary">
+          Save Changes
+        </button>
+        <button type="button" className="btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 };
 

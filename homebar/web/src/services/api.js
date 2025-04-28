@@ -72,7 +72,10 @@ export const orderAPI = {
     return apiClient.get(`/orders/${id}`);
   },
   updateOrderStatus: (id, status) => {
-    return apiClient.patch(`/orders/${id}/status`, { status });
+    return apiClient.put(`/orders/${id}/status`, { status });
+  },
+  updateOrder: (id, orderData) => {
+    return apiClient.put(`/orders/${id}`, orderData);
   },
   getOrdersByMerchant: (merchantId) => {
     return apiClient.get(`/orders?merchant=${merchantId}`);
@@ -176,11 +179,16 @@ export const ingredientAPI = {
   },
 
   updateIngredient: (merchantId, ingredientId, updateData) => {
-    return apiClient.put(`/merchants/${merchantId}/inventory/${ingredientId}`, updateData);
+    return apiClient.put(
+      `/merchants/${merchantId}/inventory/${ingredientId}`,
+      updateData
+    );
   },
 
   deleteIngredient: (merchantId, ingredientId) => {
-    return apiClient.delete(`/merchants/${merchantId}/inventory/${ingredientId}`);
+    return apiClient.delete(
+      `/merchants/${merchantId}/inventory/${ingredientId}`
+    );
   },
 };
 
@@ -195,7 +203,15 @@ export const productIngredientAPI = {
   },
 
   removeIngredientFromProduct: (productId, ingredientId) => {
-    return apiClient.delete(`/products/${productId}/ingredients/${ingredientId}`);
+    return apiClient.delete(
+      `/products/${productId}/ingredients/${ingredientId}`
+    );
+  },
+
+  updateProductIngredient: (productId, ingredientId, quantity) => {
+    return apiClient.put(`/products/${productId}/ingredients/${ingredientId}`, {
+      quantity,
+    });
   },
 };
 

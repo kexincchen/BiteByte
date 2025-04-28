@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -58,12 +59,14 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id64, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
+		fmt.Println("Error parsing product id:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
 	}
 
 	product, err := h.productService.GetByID(c.Request.Context(), uint(id64))
 	if err != nil {
+		fmt.Println("Error getting product by id:", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -75,6 +78,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	idParam := c.Param("id")
 	id64, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
+		fmt.Println("Error parsing product id:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
 	}
@@ -89,6 +93,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		IsAvailable bool    `json:"is_available"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Println("Error binding product data:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product data"})
 		return
 	}
@@ -106,6 +111,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 
 	updated, err := h.productService.Update(c.Request.Context(), product)
 	if err != nil {
+		fmt.Println("Error updating product:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

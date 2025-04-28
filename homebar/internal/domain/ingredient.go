@@ -21,4 +21,6 @@ type ProductIngredient struct {
 	ProductID    int64   `json:"product_id"`
 	IngredientID int64   `json:"ingredient_id"`
 	Quantity     float64 `json:"quantity"`
+	IngredientName         string  `json:"ingredient_name"`
+	IngredientUnit         string  `json:"ingredient_unit"`
 } 

@@ -125,3 +125,16 @@ func (r *OrderRepo) UpdateStatus(ctx context.Context, id uint, s domain.OrderSta
 		`UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2`, s, id)
 	return err
 }
+
+func (r *OrderRepo) UpdateOrder(ctx context.Context, o *domain.Order) error {
+	query := `
+		UPDATE orders 
+		SET status = $1, notes = $2, updated_at = NOW()
+		WHERE id = $3
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		o.Status, o.Notes, o.ID)
+
+	return err
+}

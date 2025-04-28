@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/service"
 )
 
@@ -76,4 +77,143 @@ func (h *OrderHandler) List(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusBadRequest, gin.H{"error": "missing filter"})
+}
+
+// func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, notes string, deliveryAddr string, deliveryTime string) error {
+// 	// Get the existing order
+// 	order, _, err := s.orderRepo.GetByID(ctx, id)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// Update fields that are provided
+// 	if status != "" {
+// 		order.Status = domain.OrderStatus(status)
+// 	}
+
+// 	if notes != "" {
+// 		order.Notes = notes
+// 	}
+
+// 	if deliveryAddr != "" {
+// 		order.DeliveryAddr = deliveryAddr
+// 	}
+
+// 	// Update the order in the database
+// 	return s.orderRepo.UpdateOrder(ctx, order, deliveryTime)
+// }
+
+// UpdateStatus PUT /api/orders/:id/status
+func (h *OrderHandler) UpdateStatus(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fmt.Println("err: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	var req struct {
+		Status string `json:"status" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Println("err: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// Convert string to OrderStatus type
+	status := domain.OrderStatus(req.Status)
+	fmt.Println("status: ", status)
+	// Validate status value
+	validStatuses := []domain.OrderStatus{
+		domain.OrderStatusPending,
+		domain.OrderStatusConfirmed,
+		domain.OrderStatusPreparing,
+		domain.OrderStatusReady,
+		domain.OrderStatusDelivered,
+		domain.OrderStatusCancelled,
+		domain.OrderStatusRefunded,
+	}
+
+	isValid := false
+	for _, s := range validStatuses {
+		if status == s {
+			isValid = true
+			break
+		}
+	}
+
+	if !isValid {
+		fmt.Println("invalid status value")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status value"})
+		return
+	}
+
+	if err := h.svc.UpdateStatus(c, uint(id), status); err != nil {
+		fmt.Println("err: ", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	fmt.Println("status updated successfully")
+
+	c.Status(http.StatusOK)
+}
+
+// UpdateOrder PUT /api/orders/:id
+func (h *OrderHandler) UpdateOrder(c *gin.Context) {
+	fmt.Println("UpdateOrder called")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fmt.Println("err: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	var orderUpdate struct {
+		Status string `json:"status"`
+		Notes  string `json:"notes"`
+	}
+
+	if err := c.ShouldBindJSON(&orderUpdate); err != nil {
+		fmt.Println("err: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// Validate status if provided
+	if orderUpdate.Status != "" {
+		status := domain.OrderStatus(orderUpdate.Status)
+		validStatuses := []domain.OrderStatus{
+			domain.OrderStatusPending,
+			domain.OrderStatusConfirmed,
+			domain.OrderStatusPreparing,
+			domain.OrderStatusReady,
+			domain.OrderStatusDelivered,
+			domain.OrderStatusCancelled,
+			domain.OrderStatusRefunded,
+		}
+
+		isValid := false
+		for _, s := range validStatuses {
+			if status == s {
+				isValid = true
+				break
+			}
+		}
+
+		if !isValid {
+			fmt.Println("invalid status value")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status value"})
+			return
+		}
+	}
+
+	if err := h.svc.UpdateOrder(c, uint(id), orderUpdate.Status, orderUpdate.Notes); err != nil {
+		fmt.Println("err: ", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	fmt.Println("order updated successfully")
+	c.Status(http.StatusOK)
 }

@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { productAPI } from '../../services/api';
-import { AuthContext } from '../../contexts/AuthContext';
+import React, { useState, useEffect, useContext } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { productAPI } from "../../services/api";
+import { AuthContext } from "../../contexts/AuthContext";
+import { ingredientAPI } from "../../services/api";
+import { productIngredientAPI } from "../../services/api";
 
 const ProductForm = ({ isEditing = false }) => {
   const { currentUser } = useContext(AuthContext);
@@ -16,13 +18,24 @@ const ProductForm = ({ isEditing = false }) => {
     file: null,
     is_available: true
   });
-  
+
   const [loading, setLoading] = useState(isEditing);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [categories, setCategories] = useState([
-    'Cocktails', 'Spirits', 'Beer', 'Wine', 'Non-Alcoholic', 'Snacks'
+    "Cocktails",
+    "Spirits",
+    "Beer",
+    "Wine",
+    "Non-Alcoholic",
+    "Snacks",
   ]);
+
+  // Add states for ingredients
+  const [ingredients, setIngredients] = useState([]);
+  const [productIngredients, setProductIngredients] = useState([]);
+  const [selectedIngredient, setSelectedIngredient] = useState("");
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     const fetchProductCategories = async () => {
@@ -30,7 +43,7 @@ const ProductForm = ({ isEditing = false }) => {
         // In a real app, you would fetch categories from the server
         // For now, we'll use the hardcoded categories
       } catch (error) {
-        console.error('Error fetching categories:', error);
+        console.error("Error fetching categories:", error);
       }
     };
 
@@ -41,36 +54,64 @@ const ProductForm = ({ isEditing = false }) => {
           setFormData(response.data);
           setLoading(false);
         } catch (error) {
-          console.error('Error fetching product details:', error);
-          setError('Failed to load product details');
+          console.error("Error fetching product details:", error);
+          setError("Failed to load product details");
           setLoading(false);
         }
       }
     };
 
+    // Fetch all ingredients for the merchant
+    const fetchIngredients = async () => {
+      try {
+        // Get merchant ID from currentUser
+        const merchantId = currentUser.merchant_id;
+        console.log("Merchant ID:", merchantId);
+        const response = await ingredientAPI.getIngredients(merchantId);
+        setIngredients(response.data);
+      } catch (error) {
+        console.error("Error fetching ingredients:", error);
+      }
+    };
+
+    // Fetch product ingredients (only when editing)
+    const fetchProductIngredients = async () => {
+      if (isEditing && id) {
+        try {
+          const response = await productIngredientAPI.getProductIngredients(id);
+          setProductIngredients(response.data || []);
+        } catch (error) {
+          console.error("Error fetching product ingredients:", error);
+        }
+      }
+    };
+
     fetchProductCategories();
+    fetchIngredients();
+
     if (isEditing) {
       fetchProductDetails();
+      fetchProductIngredients();
     }
   }, [isEditing, id]);
 
   const handleDelete = async (productId) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
+    if (window.confirm("Are you sure you want to delete this product?")) {
       try {
         await productAPI.deleteProduct(productId);
-        navigate('/merchant/products');
+        navigate("/merchant/products");
       } catch (error) {
-        console.error('Error deleting product:', error);
-        alert('Failed to delete product. Please try again.');
+        console.error("Error deleting product:", error);
+        alert("Failed to delete product. Please try again.");
       }
     }
   };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -81,14 +122,14 @@ const ProductForm = ({ isEditing = false }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!currentUser || currentUser.role !== 'merchant') {
-      setError('You must be logged in as a merchant to perform this action');
+
+    if (!currentUser || currentUser.role !== "merchant") {
+      setError("You must be logged in as a merchant to perform this action");
       return;
     }
 
     setSubmitting(true);
-    setError('');
+    setError("");
 
     try {
       // Format the data for submission
@@ -104,25 +145,102 @@ const ProductForm = ({ isEditing = false }) => {
         await productAPI.updateProduct(id, multipart);
       } else {
         await productAPI.createProduct(multipart);
+
       }
 
-      navigate('/merchant/products');
+      navigate("/merchant/products");
     } catch (error) {
-      console.error('Error saving product:', error);
-      setError('Failed to save product. Please try again.');
+      console.error("Error saving product:", error);
+      setError("Failed to save product. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Add ingredient to product
+  const handleAddIngredient = () => {
+    if (!selectedIngredient || quantity <= 0) return;
+
+    const ingredient = ingredients.find(
+      (i) => i.id === parseInt(selectedIngredient)
+    );
+
+    if (ingredient) {
+      const newIngredient = {
+        ingredient_id: ingredient.id,
+        ingredient_name: ingredient.name,
+        ingredient_unit: ingredient.unit,
+        quantity: parseFloat(quantity),
+      };
+
+      setProductIngredients([...productIngredients, newIngredient]);
+      setSelectedIngredient("");
+      setQuantity(1);
+    }
+  };
+
+  // Remove ingredient from selection
+  const handleRemoveIngredient = async (ingredientId) => {
+    if (isEditing) {
+      try {
+        await productIngredientAPI.removeIngredientFromProduct(
+          id,
+          ingredientId
+        );
+      } catch (error) {
+        console.error("Error removing ingredient:", error);
+        return;
+      }
+    }
+
+    setProductIngredients(
+      productIngredients.filter((item) => item.ingredient_id !== ingredientId)
+    );
+  };
+
+  // Update ingredient quantity
+  const handleQuantityChange = (ingredientId, newQuantity) => {
+    setProductIngredients(
+      productIngredients.map((item) =>
+        item.ingredient_id === ingredientId
+          ? { ...item, quantity: parseFloat(newQuantity) }
+          : item
+      )
+    );
+  
+    // If editing, update on the server
+    if (isEditing) {
+      const updatedItem = productIngredients.find(
+        (item) => item.ingredient_id === ingredientId
+      );
+      if (updatedItem) {
+        productIngredientAPI
+          .updateProductIngredient(
+            parseInt(id),
+            parseInt(ingredientId),
+            parseFloat(newQuantity)
+          )
+          .catch((error) => {
+            console.error("Error updating ingredient quantity:", error);
+          });
+      }
+    }
+  };
+
+  // Get filtered list of ingredients that aren't already added
+  const availableIngredients = ingredients.filter(
+    (ingredient) =>
+      !productIngredients.some((pi) => pi.ingredient_id === ingredient.id)
+  );
+
   if (loading) return <div>Loading product details...</div>;
 
   return (
     <div className="product-form-container">
-      <h1>{isEditing ? 'Edit Product' : 'Add New Product'}</h1>
-      
+      <h1>{isEditing ? "Edit Product" : "Add New Product"}</h1>
+
       {error && <div className="error">{error}</div>}
-      
+
       <form onSubmit={handleSubmit} className="product-form">
         <div className="form-group">
           <label htmlFor="name">Product Name</label>
@@ -135,7 +253,7 @@ const ProductForm = ({ isEditing = false }) => {
             required
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="description">Description</label>
           <textarea
@@ -147,7 +265,7 @@ const ProductForm = ({ isEditing = false }) => {
             required
           />
         </div>
-        
+
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="price">Price ($)</label>
@@ -162,7 +280,7 @@ const ProductForm = ({ isEditing = false }) => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="category">Category</label>
             <select
@@ -173,8 +291,10 @@ const ProductForm = ({ isEditing = false }) => {
               required
             >
               <option value="">Select a category</option>
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
               ))}
             </select>
           </div>
@@ -197,7 +317,7 @@ const ProductForm = ({ isEditing = false }) => {
               </div>
           )}
         </div>
-        
+
         <div className="form-group checkbox-group">
           <input
             type="checkbox"
@@ -208,19 +328,125 @@ const ProductForm = ({ isEditing = false }) => {
           />
           <label htmlFor="is_available">Available for purchase</label>
         </div>
-        
+
+        {/* Ingredients Section */}
+        <h2>Product Ingredients</h2>
+        <div className="ingredients-section">
+          {/* Current Ingredients Table */}
+          <div className="ingredients-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productIngredients.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="no-ingredients">
+                      No ingredients added
+                    </td>
+                  </tr>
+                ) : (
+                  productIngredients.map((item) => (
+                    <tr key={item.ingredient_id}>
+                      <td>{item.ingredient_name}</td>
+                      <td>
+                        <input
+                          type="number"
+                          className="quantity-input"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            handleQuantityChange(
+                              item.ingredient_id,
+                              e.target.value
+                            )
+                          }
+                          step="0.1"
+                          min="0.1"
+                        />
+                      </td>
+                      <td>{item.ingredient_unit}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="remove-ingredient-btn"
+                          onClick={() =>
+                            handleRemoveIngredient(item.ingredient_id)
+                          }
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add Ingredients Form */}
+          <div className="add-ingredient-form">
+            <select
+              value={selectedIngredient}
+              onChange={(e) => setSelectedIngredient(e.target.value)}
+              className="ingredient-select"
+            >
+              <option value="">Select an ingredient</option>
+              {availableIngredients.map((ingredient) => (
+                <option key={ingredient.id} value={ingredient.id}>
+                  {ingredient.name} ({ingredient.unit})
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="number"
+              placeholder="Quantity"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              step="0.1"
+              min="0.1"
+              className="quantity-input"
+            />
+
+            <button
+              type="button"
+              className="add-ingredient-btn"
+              onClick={handleAddIngredient}
+              disabled={!selectedIngredient}
+            >
+              Add Ingredient
+            </button>
+          </div>
+        </div>
+
         <div className="form-actions">
-          <button type="button" onClick={() => navigate('/merchant/products')} className="cancel-button">
+          <button
+            type="button"
+            onClick={() => navigate("/merchant/products")}
+            className="cancel-button"
+          >
             Cancel
           </button>
-          <button 
-            className="delete-button"
-            onClick={() => handleDelete(id)}
-          >
-            Delete
-          </button>
+          {isEditing && (
+            <button
+              type="button"
+              className="delete-button"
+              onClick={() => handleDelete(id)}
+            >
+              Delete
+            </button>
+          )}
           <button type="submit" disabled={submitting} className="submit-button">
-            {submitting ? "Saving..." : isEditing ? "Update Product" : "Add Product"}
+            {submitting
+              ? "Saving..."
+              : isEditing
+              ? "Update Product"
+              : "Add Product"}
           </button>
         </div>
       </form>

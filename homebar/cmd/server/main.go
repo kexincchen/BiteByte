@@ -104,6 +104,8 @@ func main() {
 			orderRoutes.POST("", orderHandler.Create)
 			orderRoutes.GET("", orderHandler.List)
 			orderRoutes.GET("/:id", orderHandler.GetByID)
+			orderRoutes.PUT("/:id/status", orderHandler.UpdateStatus)
+			orderRoutes.PUT("/:id", orderHandler.UpdateOrder)
 		}
 
 		// Merchant routes
@@ -132,6 +134,7 @@ func main() {
 		{
 			productIngredientRoutes.GET("", productIngredientHandler.GetByProductID)
 			productIngredientRoutes.POST("", productIngredientHandler.Create)
+			productIngredientRoutes.PUT("/:ingredientId", productIngredientHandler.Update)
 			productIngredientRoutes.DELETE("/:ingredientId", productIngredientHandler.Delete)
 		}
 	}

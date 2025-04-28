@@ -76,12 +76,14 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id64, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
+		fmt.Println("Error parsing product id:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
 	}
 
 	product, err := h.productService.GetByID(c.Request.Context(), uint(id64))
 	if err != nil {
+		fmt.Println("Error getting product by id:", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -93,6 +95,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
+		fmt.Println("Error parsing product id:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
 	}
@@ -107,6 +110,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid price"})
 		return
 	}
+
 	merchantID64, err := strconv.ParseUint(c.PostForm("merchant_id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid merchant id"})
@@ -131,8 +135,8 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		buf, _ := io.ReadAll(file)
 		data = buf
 	} else if !errors.Is(err, http.ErrMissingFile) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		  c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		  return
 	}
 
 	product := &domain.Product{
@@ -152,6 +156,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 
 	updated, err := h.productService.Update(c, product)
 	if err != nil {
+		fmt.Println("Error updating product:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

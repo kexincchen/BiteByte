@@ -27,10 +27,10 @@ func (r *InventoryRepository) GetByID(ctx context.Context, id uint) (*domain.Ing
 		FROM inventory_items
 		WHERE id = $1
 	`
-	
+
 	var ingredient domain.Ingredient
 	var createdAt, updatedAt time.Time
-	
+
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&ingredient.ID,
 		&ingredient.Name,
@@ -40,17 +40,17 @@ func (r *InventoryRepository) GetByID(ctx context.Context, id uint) (*domain.Ing
 		&createdAt,
 		&updatedAt,
 	)
-	
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("inventory item with ID %d not found", id)
 		}
 		return nil, err
 	}
-	
+
 	ingredient.CreatedAt = createdAt
 	ingredient.UpdatedAt = updatedAt
-	
+
 	return &ingredient, nil
 }
 
@@ -63,40 +63,41 @@ func (r *InventoryRepository) GetByProductID(ctx context.Context, productID uint
 		JOIN ingredients i ON pi.ingredient_id = i.id
 		WHERE pi.product_id = $1
 	`
-	
+
 	rows, err := r.db.QueryContext(ctx, query, productID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var ingredients []*domain.ProductIngredient
 	for rows.Next() {
 		var pi domain.ProductIngredient
 		var ingredientName, ingredientUnit string
-		
+
 		err := rows.Scan(
+			&pi.ID,
 			&pi.ProductID,
 			&pi.IngredientID,
 			&pi.Quantity,
 			&ingredientName,
 			&ingredientUnit,
 		)
-		
+
 		if err != nil {
 			return nil, err
 		}
-		
+
 		pi.IngredientName = ingredientName
 		pi.IngredientUnit = ingredientUnit
-		
+
 		ingredients = append(ingredients, &pi)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	return ingredients, nil
 }
 
@@ -107,9 +108,9 @@ func (r *InventoryRepository) CreateReservation(ctx context.Context, tx *sql.Tx,
 		(order_id, ingredient_id, quantity, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $5)
 	`
-	
+
 	now := time.Now()
-	
+
 	_, err := tx.ExecContext(
 		ctx,
 		query,
@@ -119,7 +120,7 @@ func (r *InventoryRepository) CreateReservation(ctx context.Context, tx *sql.Tx,
 		reservation.Status,
 		now,
 	)
-	
+
 	return err
 }
 
@@ -130,7 +131,7 @@ func (r *InventoryRepository) UpdateReservationStatus(ctx context.Context, tx *s
 		SET status = $1, updated_at = $2
 		WHERE order_id = $3
 	`
-	
+
 	_, err := tx.ExecContext(ctx, query, status, time.Now(), orderID)
 	return err
 }
@@ -143,18 +144,18 @@ func (r *InventoryRepository) GetReservationsByOrder(ctx context.Context, tx *sq
 		WHERE order_id = $1 AND status = 'reserved'
 		FOR UPDATE
 	`
-	
+
 	rows, err := tx.QueryContext(ctx, query, orderID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var reservations []*domain.InventoryReservation
 	for rows.Next() {
 		var res domain.InventoryReservation
 		var createdAt, updatedAt time.Time
-		
+
 		err := rows.Scan(
 			&res.ID,
 			&res.OrderID,
@@ -164,21 +165,21 @@ func (r *InventoryRepository) GetReservationsByOrder(ctx context.Context, tx *sq
 			&createdAt,
 			&updatedAt,
 		)
-		
+
 		if err != nil {
 			return nil, err
 		}
-		
+
 		res.CreatedAt = createdAt
 		res.UpdatedAt = updatedAt
-		
+
 		reservations = append(reservations, &res)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	return reservations, nil
 }
 
@@ -189,7 +190,7 @@ func (r *InventoryRepository) UpdateInventoryQuantity(ctx context.Context, tx *s
 		SET current_quantity = current_quantity + $1, updated_at = $2
 		WHERE id = $3
 	`
-	
+
 	_, err := tx.ExecContext(ctx, query, quantityChange, time.Now(), ingredientID)
 	return err
 }
@@ -201,7 +202,7 @@ func (r *InventoryRepository) CompleteOrderInventory(ctx context.Context, tx *sq
 		SET status = 'completed', updated_at = $1
 		WHERE order_id = $2 AND status = 'reserved'
 	`
-	
+
 	_, err := tx.ExecContext(ctx, query, time.Now(), orderID)
 	return err
 }
@@ -213,7 +214,7 @@ func (r *InventoryRepository) CancelOrderInventory(ctx context.Context, tx *sql.
 	if err != nil {
 		return err
 	}
-	
+
 	// Return quantities to inventory
 	for _, res := range reservations {
 		err = r.UpdateInventoryQuantity(ctx, tx, res.IngredientID, res.Quantity)
@@ -221,14 +222,14 @@ func (r *InventoryRepository) CancelOrderInventory(ctx context.Context, tx *sql.
 			return err
 		}
 	}
-	
+
 	// Mark reservations as canceled
 	query := `
 		UPDATE inventory_reservations
 		SET status = 'canceled', updated_at = $1
 		WHERE order_id = $2 AND status = 'reserved'
 	`
-	
+
 	_, err = tx.ExecContext(ctx, query, time.Now(), orderID)
 	return err
 }
@@ -242,23 +243,24 @@ func (r *InventoryRepository) CheckProductAvailability(ctx context.Context, prod
 		fmt.Println("Error: ", err)
 		return false, err
 	}
-	
+
 	// If product has no ingredients, consider it available
 	if len(ingredients) == 0 {
 		return true, nil
 	}
-	
+
 	// Check if all ingredients are available in sufficient quantity
 	for _, ingredient := range ingredients {
 		query := `
-			SELECT current_quantity 
-			FROM inventory_items 
+			SELECT quantity 
+			FROM ingredients 
 			WHERE id = $1
 		`
-		
+
 		var currentQuantity float64
 		err := r.db.QueryRowContext(ctx, query, ingredient.IngredientID).Scan(&currentQuantity)
 		if err != nil {
+			fmt.Println("Error fetching ingredient quantity:", err)
 			return false, err
 		}
 		fmt.Println("Current Quantity: ", currentQuantity)
@@ -267,14 +269,14 @@ func (r *InventoryRepository) CheckProductAvailability(ctx context.Context, prod
 			return false, nil
 		}
 	}
-	
+
 	return true, nil
 }
 
 // CheckProductsAvailability checks availability for multiple products
 func (r *InventoryRepository) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
 	availability := make(map[uint]bool)
-	
+
 	for _, id := range productIDs {
 		fmt.Println("Checking availability for product: ", id)
 		available, err := r.CheckProductAvailability(ctx, id)
@@ -285,6 +287,6 @@ func (r *InventoryRepository) CheckProductsAvailability(ctx context.Context, pro
 		availability[id] = available
 	}
 	fmt.Println("Availability: ", availability)
-	
+
 	return availability, nil
-} 
+}

@@ -143,10 +143,32 @@ const ProductForm = ({ isEditing = false }) => {
       multipart.append("is_available", formData.is_available);
       multipart.append("merchant_id", currentUser.merchant_id);
       if (formData.file) multipart.append("image", formData.file);
+
+      let productId;
       if (isEditing) {
         await productAPI.updateProduct(id, multipart);
+        productId = id;
       } else {
-        await productAPI.createProduct(multipart);
+        const response = await productAPI.createProduct(multipart);
+        productId = response.data.id;
+      }
+
+      // Process ingredients for the product
+      if (productIngredients.length > 0) {
+        // For new products, or if we've modified ingredients for existing products
+        for (const ingredient of productIngredients) {
+          try {
+            // Use addIngredientToProduct which handles both creates and updates
+            await productIngredientAPI.addIngredientToProduct(productId, {
+              product_id: parseInt(productId),
+              ingredient_id: parseInt(ingredient.ingredient_id),
+              quantity: parseFloat(ingredient.quantity),
+            });
+          } catch (ingredientError) {
+            console.error("Error saving ingredient:", ingredientError);
+            // Continue with other ingredients even if one fails
+          }
+        }
       }
 
       navigate("/merchant/products");

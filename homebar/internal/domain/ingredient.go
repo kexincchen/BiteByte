@@ -19,9 +19,10 @@ type Ingredient struct {
 
 // ProductIngredient represents the relationship between a product and its ingredients
 type ProductIngredient struct {
-	ProductID    int64   `json:"product_id"`
-	IngredientID int64   `json:"ingredient_id"`
-	Quantity     float64 `json:"quantity"`
-	IngredientName         string  `json:"ingredient_name"`
-	IngredientUnit         string  `json:"ingredient_unit"`
-} 
+	ID             int64   `json:"id"`
+	ProductID      int64   `json:"product_id"`
+	IngredientID   int64   `json:"ingredient_id"`
+	Quantity       float64 `json:"quantity"`
+	IngredientName string  `json:"ingredient_name"`
+	IngredientUnit string  `json:"ingredient_unit"`
+}

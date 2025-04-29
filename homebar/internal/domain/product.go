@@ -11,7 +11,8 @@ type Product struct {
 	Description string    `json:"description"`
 	Price       float64   `json:"price"`
 	Category    string    `json:"category"`
-	ImageURL    string    `json:"image_url"`
+	MimeType    string    `json:"-"`
+	ImageData   []byte    `json:"-"`
 	IsAvailable bool      `json:"is_available"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`

@@ -76,7 +76,13 @@ const Cart = () => {
         {cartItems.map((item) => (
           <div key={item.id} className="cart-item">
             <div className="item-image">
-              <img src={item.image_url} alt={item.name} />
+              <img
+                  src={`http://localhost:8080/api/products/${item.id}/image`}
+                  alt={item.name}
+                  onError={(e) => {
+                    e.target.src = '/placeholder.png'
+                  }}
+              />
             </div>
             <div className="item-details">
               <h3>{item.name}</h3>

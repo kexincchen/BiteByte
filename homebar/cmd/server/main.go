@@ -99,6 +99,7 @@ func main() {
 			productRoutes.DELETE("/:id", productHandler.Delete)
 			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
 			productRoutes.GET("", productHandler.GetAll)
+			productRoutes.GET("/:id/image", productHandler.GetImage)
 			productRoutes.POST("/availability", productHandler.CheckAvailability)
 		}
 

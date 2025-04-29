@@ -118,18 +118,21 @@ const Products = () => {
               {filteredProducts.map(product => (
                 <tr key={product.id}>
                   <td className="product-image-cell">
-                    <img 
-                      src={product.image_url || 'https://via.placeholder.com/50x50'} 
-                      alt={product.name}
-                      className="product-thumbnail"
+                    <img
+                        src={`http://localhost:8080/api/products/${product.id}/image`}
+                        alt={product.name}
+                        className="product-thumbnail"
+                        onError={(e) => {
+                          e.target.src = '/placeholder.png'
+                        }}
                     />
                   </td>
                   <td>{product.name}</td>
                   <td>{product.category}</td>
                   <td>${product.price.toFixed(2)}</td>
                   <td>
-                    <span 
-                      className={`status-badge ${product.is_available ? 'status-available' : 'status-unavailable'}`}
+                    <span
+                        className={`status-badge ${product.is_available ? 'status-available' : 'status-unavailable'}`}
                       onClick={() => handleToggleAvailability(product)}
                     >
                       {product.is_available ? 'Available' : 'Unavailable'}
@@ -153,4 +156,4 @@ const Products = () => {
   );
 };
 
-export default Products; 
+export default Products;

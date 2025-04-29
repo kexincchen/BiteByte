@@ -1,7 +1,9 @@
 package api
 
 import (
-	"fmt"
+	"errors"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 
@@ -21,29 +23,44 @@ func NewProductHandler(ps *service.ProductService, is *service.IngredientService
 
 // Create POST /api/products
 func (h *ProductHandler) Create(c *gin.Context) {
-	var req struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Price       float64 `json:"price"`
-		Category    string  `json:"category"`
-		MerchantID  uint    `json:"merchant_id"`
-		ImageURL    string  `json:"image_url"`
-		IsAvailable bool    `json:"is_available"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product data"})
+	// limit the size of product image to be smaller than 10 mb
+	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid form"})
 		return
 	}
 
+	name := c.PostForm("name")
+	priceStr := c.PostForm("price")
+	category := c.PostForm("category")
+	merchantID, _ := strconv.Atoi(c.PostForm("merchant_id"))
+	isAvail := c.PostForm("is_available") == "true"
+	description := c.PostForm("description")
+
+	price, _ := strconv.ParseFloat(priceStr, 64)
+
+	file, hdr, err := c.Request.FormFile("image")
+	var mime string
+	var data []byte
+	if err == nil {
+		defer func(file multipart.File) {
+			err := file.Close()
+			if err != nil {
+			}
+		}(file)
+		mime = hdr.Header.Get("Content-Type")
+		buf, _ := io.ReadAll(file)
+		data = buf
+	}
+
 	product := &domain.Product{
-		Name:        req.Name,
-		Description: req.Description,
-		Price:       req.Price,
-		Category:    req.Category,
-		MerchantID:  req.MerchantID,
-		ImageURL:    req.ImageURL,
-		IsAvailable: req.IsAvailable,
+		Name:        name,
+		Description: description,
+		Price:       price,
+		Category:    category,
+		MerchantID:  uint(merchantID),
+		IsAvailable: isAvail,
+		MimeType:    mime,
+		ImageData:   data,
 	}
 
 	created, err := h.productService.Create(c.Request.Context(), product)
@@ -76,41 +93,69 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 
 // Update PUT /api/products/:id
 func (h *ProductHandler) Update(c *gin.Context) {
-	idParam := c.Param("id")
-	id64, err := strconv.ParseUint(idParam, 10, 64)
+	idStr := c.Param("id")
+	id64, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
 		fmt.Println("Error parsing product id:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
 	}
 
-	var req struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Price       float64 `json:"price"`
-		Category    string  `json:"category"`
-		MerchantID  uint    `json:"merchant_id"`
-		ImageURL    string  `json:"image_url"`
-		IsAvailable bool    `json:"is_available"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Println("Error binding product data:", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product data"})
+	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid form"})
 		return
+	}
+
+	price, err := strconv.ParseFloat(c.PostForm("price"), 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid price"})
+		return
+	}
+
+	merchantID64, err := strconv.ParseUint(c.PostForm("merchant_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid merchant id"})
+		return
+	}
+
+	var mime string
+	var data []byte
+	file, hdr, err := c.Request.FormFile("image")
+	if err == nil {
+		defer func(file multipart.File) {
+			err := file.Close()
+			if err != nil {
+			}
+		}(file)
+
+		mime = hdr.Header.Get("Content-Type")
+		if mime != "image/jpeg" && mime != "image/png" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "only jpeg/png allowed"})
+			return
+		}
+		buf, _ := io.ReadAll(file)
+		data = buf
+	} else if !errors.Is(err, http.ErrMissingFile) {
+		  c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		  return
 	}
 
 	product := &domain.Product{
 		ID:          uint(id64),
-		Name:        req.Name,
-		Description: req.Description,
-		Price:       req.Price,
-		Category:    req.Category,
-		MerchantID:  req.MerchantID,
-		ImageURL:    req.ImageURL,
-		IsAvailable: req.IsAvailable,
+		Name:        c.PostForm("name"),
+		Description: c.PostForm("description"),
+		Price:       price,
+		Category:    c.PostForm("category"),
+		MerchantID:  uint(merchantID64),
+		IsAvailable: c.PostForm("is_available") == "true",
 	}
 
-	updated, err := h.productService.Update(c.Request.Context(), product)
+	if len(data) > 0 {
+		product.MimeType = mime
+		product.ImageData = data
+	}
+
+	updated, err := h.productService.Update(c, product)
 	if err != nil {
 		fmt.Println("Error updating product:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -160,6 +205,17 @@ func (h *ProductHandler) GetAll(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, products)
+}
+
+// GetImage GET /api/products/:id/image
+func (h *ProductHandler) GetImage(c *gin.Context) {
+	id64, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	p, err := h.productService.GetByID(c, uint(id64))
+	if err != nil || len(p.ImageData) == 0 {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.Data(http.StatusOK, p.MimeType, p.ImageData)
 }
 
 // CheckAvailability handles GET /api/products/availability

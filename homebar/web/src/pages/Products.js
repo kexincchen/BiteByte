@@ -65,7 +65,11 @@ const Products = () => {
         {filteredProducts.map(product => (
           <div key={product.id} className="product-card">
             <div className="product-image">
-              <img src={product.image_url} alt={product.name} />
+              <img
+              src={`http://localhost:8080/api/products/${product.id}/image`}
+              alt={product.name}
+              onError={(e) => {e.target.src = '/placeholder.png'}}
+              />
             </div>
             <div className="product-details">
               <h3>{product.name}</h3>
@@ -82,4 +86,4 @@ const Products = () => {
   );
 };
 
-export default Products; 
+export default Products;

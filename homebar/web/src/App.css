@@ -247,11 +247,15 @@ button:hover {
   margin-top: 15px;
 }
 
+.orders-table tbody tr:not(:last-child),
+.products-table tbody tr:not(:last-child) {
+  border-bottom: 1px solid #ddd;
+}
+
 .orders-table th, .orders-table td, 
 .products-table th, .products-table td {
   padding: 12px;
   text-align: left;
-  border-bottom: 1px solid #ddd;
 }
 
 .orders-table th, .products-table th {
@@ -353,8 +357,7 @@ button:hover {
 }
 
 .actions-cell {
-  display: flex;
-  gap: 8px;
+  text-align:center;
 }
 
 .edit-button, .delete-button {
@@ -366,6 +369,7 @@ button:hover {
 }
 
 .edit-button {
+  display:inline-block;
   background-color: #2196F3;
   color: white;
 }

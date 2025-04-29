@@ -71,6 +71,7 @@ func (r *IngredientRepository) GetByID(ctx context.Context, id int64) (*domain.I
 	)
 	
 	if err != nil {
+		fmt.Println("Error: ", err)
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
 		}

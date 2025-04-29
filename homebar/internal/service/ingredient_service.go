@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/repository/postgres"
@@ -31,6 +32,7 @@ func (s *IngredientService) CreateIngredient(ctx context.Context, ingredient *do
 }
 
 func (s *IngredientService) GetIngredientByID(ctx context.Context, id int64) (*domain.Ingredient, error) {
+	fmt.Println("Getting ingredient by ID: ", id)
 	return s.ingredientRepo.GetByID(ctx, id)
 }
 
@@ -43,6 +45,7 @@ func (s *IngredientService) UpdateIngredient(ctx context.Context, ingredient *do
 }
 
 func (s *IngredientService) DeleteIngredient(ctx context.Context, id int64) error {
+	fmt.Println("Deleting ingredient: ", id)
 	return s.ingredientRepo.Delete(ctx, id)
 }
 

@@ -57,10 +57,10 @@ func (r *InventoryRepository) GetByID(ctx context.Context, id uint) (*domain.Ing
 // GetByProductID retrieves all ingredients required for a product
 func (r *InventoryRepository) GetByProductID(ctx context.Context, productID uint) ([]*domain.ProductIngredient, error) {
 	query := `
-		SELECT pi.id, pi.product_id, pi.ingredient_id, pi.quantity_required,
+		SELECT pi.id, pi.product_id, pi.ingredient_id, pi.quantity,
 			i.name, i.unit
 		FROM product_ingredients pi
-		JOIN inventory_items i ON pi.ingredient_id = i.id
+		JOIN ingredients i ON pi.ingredient_id = i.id
 		WHERE pi.product_id = $1
 	`
 	
@@ -237,7 +237,9 @@ func (r *InventoryRepository) CancelOrderInventory(ctx context.Context, tx *sql.
 func (r *InventoryRepository) CheckProductAvailability(ctx context.Context, productID uint) (bool, error) {
 	// Get all ingredients required for this product
 	ingredients, err := r.GetByProductID(ctx, productID)
+	fmt.Println("Ingredients: ", ingredients)
 	if err != nil {
+		fmt.Println("Error: ", err)
 		return false, err
 	}
 	
@@ -259,7 +261,8 @@ func (r *InventoryRepository) CheckProductAvailability(ctx context.Context, prod
 		if err != nil {
 			return false, err
 		}
-		
+		fmt.Println("Current Quantity: ", currentQuantity)
+		fmt.Println("Required Quantity: ", ingredient.Quantity)
 		if currentQuantity < ingredient.Quantity {
 			return false, nil
 		}
@@ -273,12 +276,15 @@ func (r *InventoryRepository) CheckProductsAvailability(ctx context.Context, pro
 	availability := make(map[uint]bool)
 	
 	for _, id := range productIDs {
+		fmt.Println("Checking availability for product: ", id)
 		available, err := r.CheckProductAvailability(ctx, id)
+		fmt.Println("Available: ", available)
 		if err != nil {
 			return nil, err
 		}
 		availability[id] = available
 	}
+	fmt.Println("Availability: ", availability)
 	
 	return availability, nil
 } 

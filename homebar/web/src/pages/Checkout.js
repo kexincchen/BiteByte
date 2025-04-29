@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { checkProductsAvailability } from "../services/api";
+import { productAPI } from "../services/api";
 
 const Checkout = () => {
   const [cart, setCart] = useState([]);
@@ -13,7 +13,7 @@ const Checkout = () => {
     setIsLoadingAvailability(true);
     try {
       const productIds = cart.map((item) => item.product.id);
-      const availability = await checkProductsAvailability(productIds);
+      const availability = await productAPI.checkAvailability(productIds);
       setProductAvailability(availability);
     } catch (error) {
       console.error("Failed to check product availability", error);

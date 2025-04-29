@@ -141,6 +141,7 @@ const ProductIngredients = () => {
             {ingredients.map((ingredient) => {
               // Find the corresponding ingredient details from available ingredients
               const ingredientDetails = availableIngredients.find(i => i.id === ingredient.ingredient_id);
+              console.log("Ingredient details: ", ingredientDetails);
               return (
                 <tr key={ingredient.ingredient_id}>
                   <td>{ingredientDetails ? ingredientDetails.name : 'Unknown'}</td>

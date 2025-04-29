@@ -221,7 +221,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 // Add a new handler for checking product availability
 func (h *OrderHandler) GetProductsAvailability(c *gin.Context) {
 	var req struct {
-		ProductIDs []int64 `json:"product_ids"`
+		ProductIDs []uint `json:"product_ids"`
 	}
 
 	if err := c.BindJSON(&req); err != nil {

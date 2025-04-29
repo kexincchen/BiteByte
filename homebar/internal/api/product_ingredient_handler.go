@@ -69,6 +69,7 @@ func (h *ProductIngredientHandler) GetByIngredientID(c *gin.Context) {
 
 // Create adds an ingredient to a product
 func (h *ProductIngredientHandler) Create(c *gin.Context) {
+	fmt.Println("Create Product Ingredient...")
 	var request struct {
 		ProductID    int64   `json:"product_id"`
 		IngredientID int64   `json:"ingredient_id"`

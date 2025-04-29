@@ -50,12 +50,14 @@ func main() {
 	ingredientService := service.NewIngredientService(
 		ingredientRepo,
 		productIngredientRepo,
+		inventoryRepo,
 	)
 	productIngredientService := service.NewProductIngredientService(productIngredientRepo)
 	orderService := service.NewOrderService(
 		orderRepo,
 		productRepo,
 		ingredientService,
+		inventoryRepo,
 	)
 	merchantService := service.NewMerchantService(merchantRepo)
 

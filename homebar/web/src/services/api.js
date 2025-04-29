@@ -55,6 +55,11 @@ export const productAPI = {
   getProductsByMerchant: (merchantId) => {
     return apiClient.get(`/products/merchant/${merchantId}`);
   },
+  checkAvailability: (productIds) => {
+    return apiClient.post("/products/availability", {
+      product_ids: productIds,
+    });
+  },
 };
 
 // Order API
@@ -112,55 +117,6 @@ export const merchantAPI = {
   },
 };
 
-// Add this utility function
-export const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem("token");
-
-  const defaultOptions = {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    },
-  };
-
-  const mergedOptions = {
-    ...defaultOptions,
-    ...options,
-    headers: {
-      ...defaultOptions.headers,
-      ...(options.headers || {}),
-    },
-  };
-
-  try {
-    const response = await fetch(url, mergedOptions);
-
-    // Check if the response is JSON
-    const contentType = response.headers.get("content-type");
-    const isJson = contentType && contentType.includes("application/json");
-
-    // Parse the response
-    const data = isJson ? await response.json() : await response.text();
-
-    // Check if the response is successful
-    if (!response.ok) {
-      const error = new Error(
-        isJson && data.error
-          ? data.error
-          : `HTTP error! Status: ${response.status}`
-      );
-      error.status = response.status;
-      error.data = data;
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    console.error(`API error for ${url}:`, error);
-    throw error;
-  }
-};
-
 // Ingredient API methods
 export const ingredientAPI = {
   getIngredients: (merchantId) => {
@@ -192,10 +148,12 @@ export const ingredientAPI = {
 // Product Ingredient API methods
 export const productIngredientAPI = {
   getProductIngredients: (productId) => {
+    console.log("Getting product ingredients for product: ", productId);
     return apiClient.get(`/products/${productId}/ingredients`);
   },
 
   addIngredientToProduct: (productId, ingredientData) => {
+    console.log("Adding ingredient to product: ", ingredientData);
     return apiClient.post(`/products/${productId}/ingredients`, ingredientData);
   },
 
@@ -210,19 +168,6 @@ export const productIngredientAPI = {
       quantity,
     });
   },
-};
-
-// Add method to check product availability
-export const checkProductsAvailability = async (productIds) => {
-  try {
-    const response = await axios.post("/api/products/availability", {
-      product_ids: productIds,
-    });
-    return response.data.availability;
-  } catch (error) {
-    console.error("Error checking product availability:", error);
-    throw error;
-  }
 };
 
 export default {

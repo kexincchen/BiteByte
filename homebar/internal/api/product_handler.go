@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kexincchen/homebar/internal/domain"
@@ -234,6 +235,8 @@ func (h *ProductHandler) CheckAvailability(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check product availability"})
 		return
 	}
+
+	fmt.Println("Availability: ", availability)
 
 	c.JSON(http.StatusOK, gin.H{"availability": availability})
 }

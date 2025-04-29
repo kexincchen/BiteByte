@@ -42,11 +42,15 @@ func main() {
 	merchantRepo := repository.NewMerchantRepository(dbConn)
 	ingredientRepo := postgres.NewIngredientRepository(dbConn)
 	productIngredientRepo := postgres.NewProductIngredientRepository(dbConn)
+	inventoryRepo := postgres.NewInventoryRepository(dbConn)
 
 	// Initialize services with all repositories
 	userService := service.NewUserService(userRepo, customerRepo, merchantRepo, dbConn)
 	productService := service.NewProductService(productRepo)
-	ingredientService := service.NewIngredientService(ingredientRepo)
+	ingredientService := service.NewIngredientService(
+		ingredientRepo,
+		productIngredientRepo,
+	)
 	productIngredientService := service.NewProductIngredientService(productIngredientRepo)
 	orderService := service.NewOrderService(
 		orderRepo,
@@ -57,7 +61,7 @@ func main() {
 
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
-	productHandler := api.NewProductHandler(productService)
+	productHandler := api.NewProductHandler(productService, ingredientService)
 	orderHandler := api.NewOrderHandler(orderService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
 	ingredientHandler := api.NewIngredientHandler(ingredientService)
@@ -95,6 +99,7 @@ func main() {
 			productRoutes.DELETE("/:id", productHandler.Delete)
 			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
 			productRoutes.GET("", productHandler.GetAll)
+			productRoutes.POST("/availability", productHandler.CheckAvailability)
 		}
 
 		// Order routes
@@ -129,7 +134,7 @@ func main() {
 		}
 
 		// Product ingredient routes
-		productIngredientRoutes := apiRoutes.Group("/products/:id/ingredients")		
+		productIngredientRoutes := apiRoutes.Group("/products/:id/ingredients")
 		{
 			productIngredientRoutes.GET("", productIngredientHandler.GetByProductID)
 			productIngredientRoutes.POST("", productIngredientHandler.Create)

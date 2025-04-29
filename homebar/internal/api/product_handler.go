@@ -11,11 +11,12 @@ import (
 )
 
 type ProductHandler struct {
-	productService *service.ProductService
+	productService    *service.ProductService
+	ingredientService *service.IngredientService
 }
 
-func NewProductHandler(ps *service.ProductService) *ProductHandler {
-	return &ProductHandler{productService: ps}
+func NewProductHandler(ps *service.ProductService, is *service.IngredientService) *ProductHandler {
+	return &ProductHandler{productService: ps, ingredientService: is}
 }
 
 // Create POST /api/products
@@ -159,4 +160,24 @@ func (h *ProductHandler) GetAll(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, products)
+}
+
+// CheckAvailability handles GET /api/products/availability
+func (h *ProductHandler) CheckAvailability(c *gin.Context) {
+	var req struct {
+		ProductIDs []uint `json:"product_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	availability, err := h.ingredientService.CheckProductsAvailability(c.Request.Context(), req.ProductIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check product availability"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"availability": availability})
 }

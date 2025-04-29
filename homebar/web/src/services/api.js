@@ -215,6 +215,19 @@ export const productIngredientAPI = {
   },
 };
 
+// Add method to check product availability
+export const checkProductsAvailability = async (productIds) => {
+  try {
+    const response = await axios.post("/api/products/availability", {
+      product_ids: productIds,
+    });
+    return response.data.availability;
+  } catch (error) {
+    console.error("Error checking product availability:", error);
+    throw error;
+  }
+};
+
 export default {
   auth: authAPI,
   products: productAPI,

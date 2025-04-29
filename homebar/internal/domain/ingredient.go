@@ -14,6 +14,7 @@ type Ingredient struct {
 	LowStockThreshold float64  `json:"low_stock_threshold"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+	Description      string    `json:"description"`
 }
 
 // ProductIngredient represents the relationship between a product and its ingredients

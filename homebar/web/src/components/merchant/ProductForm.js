@@ -19,6 +19,8 @@ const ProductForm = ({ isEditing = false }) => {
     is_available: true,
   });
 
+  const [existingImageUrl, setExistingImageUrl] = useState('');
+
   const [loading, setLoading] = useState(isEditing);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +55,17 @@ const ProductForm = ({ isEditing = false }) => {
           const response = await productAPI.getProduct(id);
           console.log(response.data);
           setFormData(response.data);
+          setFormData({
+            name:        response.data.name,
+            description: response.data.description,
+            price:       response.data.price,
+            category:    response.data.category,
+            file:        null,
+            is_available:response.data.is_available
+          });
+          setExistingImageUrl(
+            `http://localhost:8080/api/products/${id}/image?ts=${Date.now()}`
+          );
           setLoading(false);
         } catch (error) {
           console.error("Error fetching product details:", error);
@@ -336,14 +349,18 @@ const ProductForm = ({ isEditing = false }) => {
             accept="image/png, image/jpeg"
             onChange={handleFileChange}
           />
-          {formData.file && (
-            <div className="image-preview">
-              <img
-                src={URL.createObjectURL(formData.file)}
-                alt="preview"
-                style={{ maxWidth: 200 }}
-              />
-            </div>
+          {(formData.file || existingImageUrl) && (
+             <div className="image-preview">
+               <img
+                 src={
+                   formData.file
+                     ? URL.createObjectURL(formData.file)
+                         : existingImageUrl
+                     }
+                 alt="preview"
+                 style={{ maxWidth: 200 }}
+               />
+             </div>
           )}
         </div>
 
@@ -483,4 +500,4 @@ const ProductForm = ({ isEditing = false }) => {
   );
 };
 
-export default ProductForm;
+export default ProductForm; 

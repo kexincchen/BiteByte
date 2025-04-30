@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +16,7 @@ import (
 	"github.com/kexincchen/homebar/internal/api"
 	"github.com/kexincchen/homebar/internal/config"
 	"github.com/kexincchen/homebar/internal/db"
+	"github.com/kexincchen/homebar/internal/raft"
 	"github.com/kexincchen/homebar/internal/repository"
 	"github.com/kexincchen/homebar/internal/repository/postgres"
 	"github.com/kexincchen/homebar/internal/service"
@@ -157,6 +160,49 @@ func main() {
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+
+	// Configure Raft
+	nodeID := os.Getenv("NODE_ID")
+	if nodeID == "" {
+		nodeID = "1" // Default node ID if not specified
+	}
+
+	// In a real system, this would be dynamically discovered or configured
+	peerIDs := []string{"1", "2", "3"}
+
+	// Create Raft-enabled order service
+	raftOrderService, err := service.NewRaftOrderService(
+		orderService,
+		nodeID,
+		peerIDs,
+	)
+
+	if err != nil {
+		log.Fatalf("Failed to create Raft order service: %v", err)
+	}
+
+	// Start the Raft node
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := raftOrderService.Start(ctx); err != nil {
+		log.Fatalf("Failed to start Raft node: %v", err)
+	}
+
+	// Use raftOrderService instead of orderService when initializing handlers
+	orderHandler = api.NewOrderHandler(raftOrderService)
+
+	// Create and start the cluster coordinator
+	raftLogger := log.New(os.Stdout, "[RAFT-COORDINATOR] ", log.LstdFlags)
+	clusterCoordinator := raft.NewClusterCoordinator(raftLogger)
+
+	// Register the node with the coordinator
+	clusterCoordinator.RegisterNode(raftOrderService.GetRaftNode())
+
+	// Start the coordinator
+	if err := clusterCoordinator.Start(ctx); err != nil {
+		log.Fatalf("Failed to start cluster coordinator: %v", err)
+	}
+	defer clusterCoordinator.Stop()
 }
 
 // CORS middleware to allow frontend to access the API

@@ -10,9 +10,13 @@ import (
 	"github.com/kexincchen/homebar/internal/service"
 )
 
-type OrderHandler struct{ svc *service.OrderService }
+type OrderHandler struct{ orderService service.OrderServiceInterface }
 
-func NewOrderHandler(s *service.OrderService) *OrderHandler { return &OrderHandler{svc: s} }
+func NewOrderHandler(orderService service.OrderServiceInterface) *OrderHandler {
+	return &OrderHandler{
+		orderService: orderService,
+	}
+}
 
 // Create POST /api/orders
 func (h *OrderHandler) Create(c *gin.Context) {
@@ -40,7 +44,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		})
 	}
 
-	order, err := h.svc.CreateOrder(c, req.CustomerID, req.MerchantID, items, req.Notes)
+	order, err := h.orderService.CreateOrder(c, req.CustomerID, req.MerchantID, items, req.Notes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -51,7 +55,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 // GetByID GET /api/orders/:id
 func (h *OrderHandler) GetByID(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	o, items, err := h.svc.GetByID(c, uint(id))
+	o, items, err := h.orderService.GetByID(c, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -64,7 +68,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 	if cidStr := c.Query("customer"); cidStr != "" {
 		fmt.Println("cidStr: ", cidStr)
 		cid, _ := strconv.Atoi(cidStr)
-		list, _ := h.svc.ListByCustomer(c, uint(cid))
+		list, _ := h.orderService.ListByCustomer(c, uint(cid))
 		fmt.Println("list: ", list)
 		c.JSON(http.StatusOK, list)
 		return
@@ -72,7 +76,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 	if midStr := c.Query("merchant"); midStr != "" {
 		fmt.Println("merchant midStr: ", midStr)
 		mid, _ := strconv.Atoi(midStr)
-		list, _ := h.svc.ListByMerchant(c, uint(mid))
+		list, _ := h.orderService.ListByMerchant(c, uint(mid))
 		c.JSON(http.StatusOK, list)
 		return
 	}
@@ -150,7 +154,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.UpdateStatus(c, uint(id), status); err != nil {
+	if err := h.orderService.UpdateStatus(c, uint(id), status); err != nil {
 		fmt.Println("err: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -209,7 +213,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		}
 	}
 
-	if err := h.svc.UpdateOrder(c, uint(id), orderUpdate.Status, orderUpdate.Notes); err != nil {
+	if err := h.orderService.UpdateOrder(c, uint(id), orderUpdate.Status, orderUpdate.Notes); err != nil {
 		fmt.Println("err: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -229,7 +233,7 @@ func (h *OrderHandler) GetProductsAvailability(c *gin.Context) {
 		return
 	}
 
-	availability, err := h.svc.CheckProductsAvailability(c, req.ProductIDs)
+	availability, err := h.orderService.CheckProductsAvailability(c, req.ProductIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check product availability"})
 		return

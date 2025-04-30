@@ -98,6 +98,16 @@ func (n *RaftNode) Start(ctx context.Context) error {
 
 // run is the main loop of the Raft node
 func (n *RaftNode) run(ctx context.Context) {
+	// Initialize timers if they haven't been initialized yet
+	if n.electionTimer == nil {
+		timeout := MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout)))
+		n.electionTimer = time.NewTimer(timeout)
+	}
+
+	if n.heartbeatTimer == nil {
+		n.heartbeatTimer = time.NewTimer(n.heartbeatInterval)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():

@@ -10,9 +10,17 @@ import (
 	"github.com/kexincchen/homebar/internal/service"
 )
 
-type OrderHandler struct{ svc *service.OrderService }
+type OrderHandler struct {
+	svc            *service.OrderService
+	productService *service.ProductService
+}
 
-func NewOrderHandler(s *service.OrderService) *OrderHandler { return &OrderHandler{svc: s} }
+func NewOrderHandler(s *service.OrderService, ps *service.ProductService) *OrderHandler {
+	return &OrderHandler{
+		svc:            s,
+		productService: ps,
+	}
+}
 
 // Create POST /api/orders
 func (h *OrderHandler) Create(c *gin.Context) {
@@ -56,7 +64,32 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"order": o, "items": items})
+
+	// 获取每个订单项对应的产品信息
+	itemsWithProducts := make([]map[string]interface{}, 0)
+	for _, item := range items {
+		product, err := h.productService.GetByID(c, item.ProductID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product details"})
+			return
+		}
+
+		itemWithProduct := map[string]interface{}{
+			"id":                  item.ID,
+			"order_id":            item.OrderID,
+			"product_id":          item.ProductID,
+			"quantity":            item.Quantity,
+			"price":               item.Price,
+			"product_name":        product.Name,
+			"product_description": product.Description,
+		}
+		itemsWithProducts = append(itemsWithProducts, itemWithProduct)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"order": o,
+		"items": itemsWithProducts,
+	})
 }
 
 // List GET /api/orders?customer=1  or  ?merchant=2

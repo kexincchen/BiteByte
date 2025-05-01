@@ -6,7 +6,9 @@ require (
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/rpc v1.2.1
 	github.com/jackc/pgx/v5 v5.7.4
+	github.com/lib/pq v1.10.9
 	golang.org/x/crypto v0.31.0
 )
 

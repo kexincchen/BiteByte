@@ -111,7 +111,10 @@ const Dashboard = () => {
             merchantId
           );
           console.log("Inventory response: ", inventoryResponse);
-          if (inventoryResponse.status >= 200 && inventoryResponse.status < 300) {
+          if (
+            inventoryResponse.status >= 200 &&
+            inventoryResponse.status < 300
+          ) {
             const inventoryData = await inventoryResponse.data;
             console.log("Inventory response: ", inventoryData);
             setIngredientStats({
@@ -193,6 +196,31 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteOrder = async (orderId) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this order? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      // First set status to cancelled
+      await orderAPI.updateOrderStatus(orderId, "cancelled");
+
+      // Then remove from local state
+      setRecentOrders(recentOrders.filter((order) => order.id !== orderId));
+      closeOrderModal();
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      setError("Failed to delete order: " + (error.message || "Unknown error"));
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   if (loading) return <div>Loading dashboard...</div>;
   if (error) return <div className="error">{error}</div>;
 
@@ -269,15 +297,15 @@ const Dashboard = () => {
                       onChange={(e) =>
                         handleStatusChange(order.id, e.target.value)
                       }
-                      disabled={updatingStatus}
+                      disabled={
+                        updatingStatus ||
+                        order.status === "completed" ||
+                        order.status === "cancelled"
+                      }
                     >
                       <option value="pending">Pending</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="preparing">Preparing</option>
-                      <option value="ready">Ready</option>
-                      <option value="delivered">Delivered</option>
+                      <option value="completed">Completed</option>
                       <option value="cancelled">Cancelled</option>
-                      <option value="refunded">Refunded</option>
                     </select>
                   </td>
                   <td>${order.total_amount.toFixed(2)}</td>
@@ -304,6 +332,7 @@ const Dashboard = () => {
               order={selectedOrder}
               onSubmit={updateOrder}
               onCancel={closeOrderModal}
+              onDelete={handleDeleteOrder}
             />
           </div>
         </div>
@@ -312,7 +341,7 @@ const Dashboard = () => {
   );
 };
 
-const OrderEditForm = ({ order, onSubmit, onCancel }) => {
+const OrderEditForm = ({ order, onSubmit, onCancel, onDelete }) => {
   const [formData, setFormData] = useState({
     ...order,
     notes: order.notes || "",
@@ -340,14 +369,13 @@ const OrderEditForm = ({ order, onSubmit, onCancel }) => {
           value={formData.status}
           onChange={handleChange}
           className={`status-select status-${formData.status}`}
+          disabled={
+            formData.status === "completed" || formData.status === "cancelled"
+          }
         >
           <option value="pending">Pending</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="preparing">Preparing</option>
-          <option value="ready">Ready</option>
-          <option value="delivered">Delivered</option>
+          <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
-          <option value="refunded">Refunded</option>
         </select>
       </div>
 
@@ -373,12 +401,21 @@ const OrderEditForm = ({ order, onSubmit, onCancel }) => {
       </div> */}
 
       <div className="form-actions">
-        <button type="submit" className="btn-primary">
-          Save Changes
+        <button
+          type="button"
+          className="btn-delete"
+          onClick={() => onDelete(order.id)}
+        >
+          Delete Order
         </button>
-        <button type="button" className="btn-secondary" onClick={onCancel}>
-          Cancel
-        </button>
+        <div className="right-actions">
+          <button type="button" className="btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary">
+            Save Changes
+          </button>
+        </div>
       </div>
     </form>
   );

@@ -48,7 +48,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		})
 	}
 
-	order, err := h.svc.CreateOrder(c, req.CustomerID, req.MerchantID, items, req.Notes)
+	order, err := h.orderService.CreateOrder(c, req.CustomerID, req.MerchantID, items, req.Notes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -59,7 +59,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 // GetByID GET /api/orders/:id
 func (h *OrderHandler) GetByID(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	o, items, err := h.svc.GetByID(c, uint(id))
+	o, items, err := h.orderService.GetByID(c, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -97,7 +97,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 	if cidStr := c.Query("customer"); cidStr != "" {
 		fmt.Println("cidStr: ", cidStr)
 		cid, _ := strconv.Atoi(cidStr)
-		list, _ := h.svc.ListByCustomer(c, uint(cid))
+		list, _ := h.orderService.ListByCustomer(c, uint(cid))
 		fmt.Println("list: ", list)
 		c.JSON(http.StatusOK, list)
 		return
@@ -105,7 +105,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 	if midStr := c.Query("merchant"); midStr != "" {
 		fmt.Println("merchant midStr: ", midStr)
 		mid, _ := strconv.Atoi(midStr)
-		list, _ := h.svc.ListByMerchant(c, uint(mid))
+		list, _ := h.orderService.ListByMerchant(c, uint(mid))
 		c.JSON(http.StatusOK, list)
 		return
 	}
@@ -140,7 +140,6 @@ func (h *OrderHandler) List(c *gin.Context) {
 func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		fmt.Println("err: ", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
 		return
 	}
@@ -150,23 +149,16 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Println("err: ", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	// Convert string to OrderStatus type
-	status := domain.OrderStatus(req.Status)
-	fmt.Println("status: ", status)
 	// Validate status value
+	status := domain.OrderStatus(req.Status)
 	validStatuses := []domain.OrderStatus{
 		domain.OrderStatusPending,
-		domain.OrderStatusConfirmed,
-		domain.OrderStatusPreparing,
-		domain.OrderStatusReady,
-		domain.OrderStatusDelivered,
+		domain.OrderStatusCompleted,
 		domain.OrderStatusCancelled,
-		domain.OrderStatusRefunded,
 	}
 
 	isValid := false
@@ -178,27 +170,27 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	if !isValid {
-		fmt.Println("invalid status value")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status value"})
 		return
 	}
 
-	if err := h.svc.UpdateStatus(c, uint(id), status); err != nil {
-		fmt.Println("err: ", err)
+	// Update the status (this will also handle inventory)
+	if err := h.orderService.UpdateStatus(c, uint(id), status); err != nil {
+		if err.Error() == "invalid status transition" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status transition"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	fmt.Println("status updated successfully")
 
 	c.Status(http.StatusOK)
 }
 
 // UpdateOrder PUT /api/orders/:id
 func (h *OrderHandler) UpdateOrder(c *gin.Context) {
-	fmt.Println("UpdateOrder called")
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		fmt.Println("err: ", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
 		return
 	}
@@ -209,7 +201,6 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&orderUpdate); err != nil {
-		fmt.Println("err: ", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
@@ -219,12 +210,8 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		status := domain.OrderStatus(orderUpdate.Status)
 		validStatuses := []domain.OrderStatus{
 			domain.OrderStatusPending,
-			domain.OrderStatusConfirmed,
-			domain.OrderStatusPreparing,
-			domain.OrderStatusReady,
-			domain.OrderStatusDelivered,
+			domain.OrderStatusCompleted,
 			domain.OrderStatusCancelled,
-			domain.OrderStatusRefunded,
 		}
 
 		isValid := false
@@ -236,18 +223,20 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		}
 
 		if !isValid {
-			fmt.Println("invalid status value")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status value"})
 			return
 		}
 	}
 
-	if err := h.svc.UpdateOrder(c, uint(id), orderUpdate.Status, orderUpdate.Notes); err != nil {
-		fmt.Println("err: ", err)
+	if err := h.orderService.UpdateOrder(c, uint(id), orderUpdate.Status, orderUpdate.Notes); err != nil {
+		if err.Error() == "invalid status transition" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status transition"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	fmt.Println("order updated successfully")
+
 	c.Status(http.StatusOK)
 }
 
@@ -262,7 +251,7 @@ func (h *OrderHandler) GetProductsAvailability(c *gin.Context) {
 		return
 	}
 
-	availability, err := h.svc.CheckProductsAvailability(c, req.ProductIDs)
+	availability, err := h.orderService.CheckProductsAvailability(c, req.ProductIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check product availability"})
 		return

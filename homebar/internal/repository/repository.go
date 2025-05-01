@@ -51,14 +51,21 @@ type OrderRepository interface {
 	GetByID(ctx context.Context, id uint) (*domain.Order, []domain.OrderItem, error)
 	GetByCustomer(ctx context.Context, customerID uint) ([]*domain.Order, error)
 	GetByMerchant(ctx context.Context, merchantID uint) ([]*domain.Order, error)
-	UpdateStatus(ctx context.Context, orderID uint, status domain.OrderStatus) error
-	UpdateOrder(ctx context.Context, o *domain.Order) error
+	UpdateStatus(ctx context.Context, tx *sql.Tx, id uint, st domain.OrderStatus) error
+	Update(ctx context.Context, tx *sql.Tx, order *domain.Order) error
+	GetDB() *sql.DB
 }
 
-type InventoryRepository interface {
-	GetByMerchantAndIngredient(ctx context.Context, merchantID, ingredientID uint) (*domain.Inventory, error)
-	UpdateQuantity(ctx context.Context, inventoryID uint, quantityChange float64) error
-	LogTransaction(ctx context.Context, transaction *domain.InventoryTransaction) error
+type IngredientRepository interface {
+	Create(ctx context.Context, ingredient *domain.Ingredient) error
+	GetByID(ctx context.Context, id int64) (*domain.Ingredient, error)
+	GetByMerchant(ctx context.Context, merchantID int64) ([]*domain.Ingredient, error)
+	Update(ctx context.Context, ingredient *domain.Ingredient) error
+	Delete(ctx context.Context, id int64) error
+	LockInventoryForOrder(ctx context.Context, orderItems []*domain.OrderItem) (bool, error)
+	RestoreInventoryForOrder(ctx context.Context, orderID uint) error
+	CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error)
+	GetInventorySummary(ctx context.Context, merchantID int64) (map[string]interface{}, error)
 }
 
 type MerchantRepository interface {

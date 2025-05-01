@@ -120,21 +120,40 @@ func (r *OrderRepo) list(ctx context.Context, where string, arg interface{}) ([]
 	return list, rows.Err()
 }
 
-func (r *OrderRepo) UpdateStatus(ctx context.Context, id uint, s domain.OrderStatus) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2`, s, id)
+// UpdateStatus updates the status of an order
+func (r *OrderRepo) UpdateStatus(ctx context.Context, tx *sql.Tx, id uint, status domain.OrderStatus) error {
+	query := `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`
+
+	var err error
+	if tx != nil {
+		_, err = tx.ExecContext(ctx, query, status, id)
+	} else {
+		_, err = r.db.ExecContext(ctx, query, status, id)
+	}
+
 	return err
 }
 
-func (r *OrderRepo) UpdateOrder(ctx context.Context, o *domain.Order) error {
+// Update updates an order
+func (r *OrderRepo) Update(ctx context.Context, tx *sql.Tx, order *domain.Order) error {
 	query := `
 		UPDATE orders 
 		SET status = $1, notes = $2, updated_at = NOW()
 		WHERE id = $3
 	`
 
-	_, err := r.db.ExecContext(ctx, query,
-		o.Status, o.Notes, o.ID)
+	var err error
+	if tx != nil {
+		_, err = tx.ExecContext(ctx, query, order.Status, order.Notes, order.ID)
+	} else {
+		_, err = r.db.ExecContext(ctx, query, order.Status, order.Notes, order.ID)
+	}
 
 	return err
 }
+
+// GetDB returns the database connection
+func (r *OrderRepo) GetDB() *sql.DB {
+	return r.db
+}
+

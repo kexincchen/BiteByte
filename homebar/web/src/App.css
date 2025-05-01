@@ -274,24 +274,9 @@ button:hover {
   color: #e65100;
 }
 
-.status-confirmed {
-  background-color: #90caf9;
-  color: #0d47a1;
-}
-
-.status-preparing {
-  background-color: #ce93d8;
-  color: #4a148c;
-}
-
-.status-ready {
-  background-color: #a5d6a7;
+.status-completed {
+  background-color: #a5d6a7; 
   color: #1b5e20;
-}
-
-.status-delivered {
-  background-color: #80cbc4;
-  color: #004d40;
 }
 
 .status-cancelled {
@@ -464,9 +449,13 @@ button:hover {
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 15px;
-  margin-top: 30px;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.right-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .cancel-button {
@@ -500,25 +489,19 @@ button:hover {
   cursor: pointer;
 }
 
-.status-pending {
+.status-select.status-pending {
   background-color: #fff3cd;
   color: #856404;
   border: 1px solid #ffeeba;
 }
 
-.status-processing {
-  background-color: #cce5ff;
-  color: #004085;
-  border: 1px solid #b8daff;
-}
-
-.status-completed {
+.status-select.status-completed {
   background-color: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
 }
 
-.status-cancelled {
+.status-select.status-cancelled {
   background-color: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
@@ -564,9 +547,13 @@ button:hover {
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.right-actions {
+  display: flex;
   gap: 10px;
-  margin-top: 10px;
 }
 
 .btn-primary {
@@ -602,25 +589,7 @@ button:hover {
   border: 1px solid #ffeeba;
 }
 
-.status-select.status-confirmed {
-  background-color: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
-}
-
-.status-select.status-preparing {
-  background-color: #cce5ff;
-  color: #004085;
-  border: 1px solid #b8daff;
-}
-
-.status-select.status-ready {
-  background-color: #e2e3ff;
-  color: #2d31b9;
-  border: 1px solid #cdceff;
-}
-
-.status-select.status-delivered {
+.status-select.status-completed {
   background-color: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
@@ -675,8 +644,7 @@ button:hover {
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: space-between;
   margin-top: 15px;
 }
 
@@ -703,4 +671,19 @@ button:hover {
 
 .btn-secondary {
   background-color: #e0e0e0;
+}
+
+/* Add this to your existing CSS */
+.btn-delete {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: auto; /* This pushes it to the left */
+}
+
+.btn-delete:hover {
+  background-color: #d32f2f;
 }

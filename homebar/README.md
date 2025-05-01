@@ -101,22 +101,16 @@ CREATE TABLE IF NOT EXISTS ingredients (
     updated_at TIMESTAMP NOT NULL
 );
 
--- Create index on merchant_id for faster queries
-CREATE INDEX IF NOT EXISTS idx_ingredients_merchant_id ON ingredients(merchant_id);
-
--- Create product_ingredients table
 CREATE TABLE IF NOT EXISTS product_ingredients (
     id SERIAL PRIMARY KEY,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
     quantity NUMERIC(10, 2) NOT NULL,
+    CONSTRAINT unique_product_ingredient UNIQUE (product_id, ingredient_id)
 );
 
-ALTER TABLE product_ingredients 
-ADD CONSTRAINT unique_product_ingredient 
-UNIQUE (product_id, ingredient_id);
-
 -- Create indexes for faster lookups
+CREATE INDEX IF NOT EXISTS idx_ingredients_merchant_id ON ingredients(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_product_ingredients_product_id ON product_ingredients(product_id);
 CREATE INDEX IF NOT EXISTS idx_product_ingredients_ingredient_id ON product_ingredients(ingredient_id); 
   

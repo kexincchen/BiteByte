@@ -2,7 +2,7 @@ import React, { useContext, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CartContext } from "../contexts/CartContext";
 import { AuthContext } from "../contexts/AuthContext";
-import { orderAPI } from "../services/api";
+import {orderAPI, productAPI} from "../services/api";
 
 const Cart = () => {
   const { cartItems, cartTotal, removeFromCart, updateQuantity, clearCart } =
@@ -77,7 +77,7 @@ const Cart = () => {
           <div key={item.id} className="cart-item">
             <div className="item-image">
               <img
-                  src={`http://localhost:8080/api/products/${item.id}/image`}
+                  src={productAPI.imageUrl(item.id)}
                   alt={item.name}
                   onError={(e) => {
                     e.target.src = '/placeholder.png'

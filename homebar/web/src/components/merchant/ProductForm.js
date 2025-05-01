@@ -64,7 +64,7 @@ const ProductForm = ({ isEditing = false }) => {
             is_available:response.data.is_available
           });
           setExistingImageUrl(
-            `http://localhost:8080/api/products/${id}/image?ts=${Date.now()}`
+              productAPI.imageUrl(id)
           );
           setLoading(false);
         } catch (error) {
@@ -82,7 +82,7 @@ const ProductForm = ({ isEditing = false }) => {
         const merchantId = currentUser.merchant_id;
         console.log("Merchant ID:", merchantId);
         const response = await ingredientAPI.getIngredients(merchantId);
-        setIngredients(response.data);
+        setIngredients(response.data || []);
       } catch (error) {
         console.error("Error fetching ingredients:", error);
       }
@@ -269,7 +269,7 @@ const ProductForm = ({ isEditing = false }) => {
   };
 
   // Get filtered list of ingredients that aren't already added
-  const availableIngredients = ingredients.filter(
+  const availableIngredients = (ingredients || []).filter(
     (ingredient) =>
       !productIngredients.some((pi) => pi.ingredient_id === ingredient.id)
   );

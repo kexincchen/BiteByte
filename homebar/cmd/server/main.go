@@ -68,7 +68,7 @@ func main() {
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
 	productHandler := api.NewProductHandler(productService, ingredientService)
-	orderHandler := api.NewOrderHandler(orderService)
+	orderHandler := api.NewOrderHandler(orderService, productService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
 	ingredientHandler := api.NewIngredientHandler(ingredientService)
 	productIngredientHandler := api.NewProductIngredientHandler(

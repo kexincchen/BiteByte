@@ -22,12 +22,10 @@ const Products = () => {
 
     try {
       const response = await productAPI.getProductsByMerchant(currentUser.merchant_id);
-      setProducts(response.data);
-      
-      // Extract unique categories
-      const uniqueCategories = [...new Set(response.data.map(p => p.category))];
+      const data = Array.isArray(response.data) ? response.data : [];
+      setProducts(data);
+      const uniqueCategories = [...new Set(data.map(p => p.category))];
       setCategories(uniqueCategories);
-      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -119,7 +117,7 @@ const Products = () => {
                 <tr key={product.id}>
                   <td className="product-image-cell">
                     <img
-                        src={`http://localhost:8080/api/products/${product.id}/image`}
+                        src={productAPI.imageUrl(product.id)}
                         alt={product.name}
                         className="product-thumbnail"
                         onError={(e) => {

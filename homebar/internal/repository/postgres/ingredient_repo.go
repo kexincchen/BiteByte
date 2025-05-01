@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kexincchen/homebar/internal/domain"
+	"github.com/lib/pq"
 )
 
 type IngredientRepository struct {
@@ -184,56 +185,261 @@ func (r *IngredientRepository) GetInventorySummary(ctx context.Context, merchant
 	}, nil
 }
 
+// func (r *IngredientRepository) GetInventorySummary(ctx context.Context, merchantID int64) (map[string]interface{}, error) {
+// 	summary := make(map[string]interface{})
+	
+// 	// Get total count of ingredients
+// 	var totalCount int
+// 	err := r.db.QueryRowContext(
+// 		ctx,
+// 		"SELECT COUNT(*) FROM ingredients WHERE merchant_id = $1",
+// 		merchantID,
+// 	).Scan(&totalCount)
+	
+// 	if err != nil {
+// 		return nil, err
+// 	}
+	
+// 	summary["totalIngredients"] = totalCount
+	
+// 	// Get count of low stock items
+// 	var lowStockCount int
+// 	err = r.db.QueryRowContext(
+// 		ctx,
+// 		"SELECT COUNT(*) FROM ingredients WHERE merchant_id = $1 AND quantity <= low_stock_threshold",
+// 		merchantID,
+// 	).Scan(&lowStockCount)
+	
+// 	if err != nil {
+// 		return nil, err
+// 	}
+	
+// 	summary["lowStockCount"] = lowStockCount
+	
+// 	return summary, nil
+// }
+
+// CheckProductsAvailability checks if multiple products have sufficient ingredients
+func (r *IngredientRepository) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
+	result := make(map[uint]bool)
+	
+	// Get product ingredients for all products in a single query
+	query := `
+		SELECT pi.product_id, pi.ingredient_id, pi.quantity, i.quantity as available_quantity
+		FROM product_ingredients pi
+		JOIN ingredients i ON pi.ingredient_id = i.id
+		WHERE pi.product_id = ANY($1)
+	`
+	
+	// Convert []uint to []int64 for PostgreSQL ANY operator
+	ids := make([]int64, len(productIDs))
+	for i, id := range productIDs {
+		ids[i] = int64(id)
+		result[id] = true // Initialize all products as available
+	}
+	
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	// Track which products we've checked to handle products with no ingredients
+	productChecked := make(map[uint]bool)
+	
+	for rows.Next() {
+		var productID, ingredientID int64
+		var requiredQty, availableQty float64
+		
+		if err := rows.Scan(&productID, &ingredientID, &requiredQty, &availableQty); err != nil {
+			return nil, err
+		}
+		
+		productChecked[uint(productID)] = true
+		
+		// If there's not enough of this ingredient, mark the product as unavailable
+		if availableQty < requiredQty {
+			result[uint(productID)] = false
+		}
+	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	
+	return result, nil
+}
+
 // LockInventoryForOrder attempts to lock inventory for an order
 // Returns false if there's not enough inventory
 func (r *IngredientRepository) LockInventoryForOrder(ctx context.Context, orderItems []*domain.OrderItem) (bool, error) {
+	// Start a transaction
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}
 	defer tx.Rollback()
 
-	// For each order item, get its product ingredients and check inventory
+	// Map to store required ingredients and their quantities
+	requiredIngredients := make(map[int64]float64)
+
+	// First pass: collect all required ingredients for all products
 	for _, item := range orderItems {
-		ingredients, err := r.getProductIngredients(ctx, tx, int64(item.ProductID))
+		// Get the product ingredients
+		query := `
+			SELECT ingredient_id, quantity
+			FROM product_ingredients
+			WHERE product_id = $1
+		`
+		rows, err := tx.QueryContext(ctx, query, item.ProductID)
 		if err != nil {
 			return false, err
 		}
 
-		// Check and update each ingredient
-		for _, prodIngredient := range ingredients {
-			ingredient, err := r.getIngredientWithLock(ctx, tx, prodIngredient.IngredientID)
-			if err != nil {
+		for rows.Next() {
+			var ingredientID int64
+			var quantity float64
+			if err := rows.Scan(&ingredientID, &quantity); err != nil {
+				rows.Close()
 				return false, err
 			}
-
-			// Calculate required quantity
-			requiredQty := prodIngredient.Quantity * float64(item.Quantity)
-
-			// Check if we have enough
-			if ingredient.Quantity < requiredQty {
-				return false, nil // Not enough inventory
-			}
-
-			// Update the ingredient quantity
-			_, err = tx.ExecContext(
-				ctx,
-				"UPDATE ingredients SET quantity = quantity - $1 WHERE id = $2",
-				requiredQty,
-				ingredient.ID,
-			)
-			if err != nil {
-				return false, err
-			}
+			
+			// Multiply by the order item quantity and add to our requirements
+			requiredIngredients[ingredientID] += quantity * float64(item.Quantity)
+		}
+		rows.Close()
+		
+		if err = rows.Err(); err != nil {
+			return false, err
 		}
 	}
 
-	// If we get here, everything is successful
+	// Second pass: check and update each ingredient with locking
+	for ingredientID, requiredQty := range requiredIngredients {
+		// Lock the row for update
+		var currentQty float64
+		query := `
+			SELECT quantity
+			FROM ingredients
+			WHERE id = $1
+			FOR UPDATE
+		`
+		err := tx.QueryRowContext(ctx, query, ingredientID).Scan(&currentQty)
+		if err != nil {
+			return false, err
+		}
+
+		// Check if there's enough
+		if currentQty < requiredQty {
+			return false, nil // Not enough inventory
+		}
+
+		// Update the inventory
+		_, err = tx.ExecContext(
+			ctx,
+			`UPDATE ingredients SET quantity = quantity - $1, updated_at = NOW() WHERE id = $2`,
+			requiredQty,
+			ingredientID,
+		)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Everything is good, commit the transaction
 	if err := tx.Commit(); err != nil {
 		return false, err
 	}
 
 	return true, nil
+}
+
+// RestoreInventoryForOrder restores ingredients that were previously locked for an order
+func (r *IngredientRepository) RestoreInventoryForOrder(ctx context.Context, orderID uint) error {
+	// Start a transaction
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// First get the order items
+	query := `
+		SELECT product_id, quantity
+		FROM order_items
+		WHERE order_id = $1
+	`
+	rows, err := tx.QueryContext(ctx, query, orderID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var orderItems []*domain.OrderItem
+	for rows.Next() {
+		var item domain.OrderItem
+		if err := rows.Scan(&item.ProductID, &item.Quantity); err != nil {
+			return err
+		}
+		orderItems = append(orderItems, &item)
+	}
+
+	if err = rows.Err(); err != nil {
+		return err
+	}
+
+	// Map to store ingredients to be restored
+	ingredientsToRestore := make(map[int64]float64)
+
+	// Collect all ingredients used in this order
+	for _, item := range orderItems {
+		// Get the product ingredients
+		query := `
+			SELECT ingredient_id, quantity
+			FROM product_ingredients
+			WHERE product_id = $1
+		`
+		pRows, err := tx.QueryContext(ctx, query, item.ProductID)
+		if err != nil {
+			return err
+		}
+
+		for pRows.Next() {
+			var ingredientID int64
+			var quantity float64
+			if err := pRows.Scan(&ingredientID, &quantity); err != nil {
+				pRows.Close()
+				return err
+			}
+			
+			// Multiply by the order item quantity and add to our restoration map
+			fmt.Println("ingredientID: ", ingredientID)
+			fmt.Println("quantity: ", quantity)
+			fmt.Println("item.Quantity: ", item.Quantity)
+			ingredientsToRestore[ingredientID] += quantity * float64(item.Quantity)
+		}
+		pRows.Close()
+		
+		if err = pRows.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Restore each ingredient
+	for ingredientID, restoreQty := range ingredientsToRestore {
+		_, err = tx.ExecContext(
+			ctx,
+			`UPDATE ingredients SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2`,
+			restoreQty,
+			ingredientID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }
 
 // Helper to get a single ingredient with FOR UPDATE lock

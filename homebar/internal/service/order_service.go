@@ -104,10 +104,59 @@ func (s *OrderService) ListByMerchant(ctx context.Context, mid uint) ([]*domain.
 	return s.orderRepo.GetByMerchant(ctx, mid)
 }
 
-func (s *OrderService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
-	return s.orderRepo.UpdateStatus(ctx, id, st)
+func (s *OrderService) UpdateStatus(ctx context.Context, id uint, status domain.OrderStatus) error {
+	// First get the current order status
+	order, _, err := s.orderRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Check for valid status transitions
+	if !isValidStatusTransition(order.Status, status) {
+		return errors.New("invalid status transition")
+	}
+
+	// Start transaction
+	tx, err := s.orderRepo.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Update the order status
+	err = s.orderRepo.UpdateStatus(ctx, tx, id, status)
+	if err != nil {
+		return err
+	}
+
+	// Handle inventory based on status change - ONLY for status changes to cancelled
+	if status == domain.OrderStatusCancelled && order.Status == domain.OrderStatusPending {
+		// For cancelled orders, restore the inventory
+		err = s.ingredientService.CancelOrderInventory(ctx, id)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }
 
+// isValidStatusTransition checks if a status transition is valid
+func isValidStatusTransition(current, new domain.OrderStatus) bool {
+	switch current {
+	case domain.OrderStatusPending:
+		// Pending orders can be completed or cancelled
+		return new == domain.OrderStatusCompleted || new == domain.OrderStatusCancelled
+	case domain.OrderStatusCompleted, domain.OrderStatusCancelled:
+		// Completed or cancelled orders cannot change status
+		return false
+	default:
+		return false
+	}
+}
+
+// UpdateOrder updates an order's details
 func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, notes string) error {
 	// Get the existing order
 	order, _, err := s.orderRepo.GetByID(ctx, id)
@@ -115,35 +164,77 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, 
 		return err
 	}
 
-	// Update fields that are provided
-	if status != "" {
-		order.Status = domain.OrderStatus(status)
+	// Start transaction
+	tx, err := s.orderRepo.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Track if we need to update the order
+	needsUpdate := false
+
+	// Handle status change if provided
+	statusChanged := false
+	newStatus := order.Status // Default to current status
+
+	if status != "" && string(order.Status) != status {
+		newStatus = domain.OrderStatus(status)
+		if !isValidStatusTransition(order.Status, newStatus) {
+			return errors.New("invalid status transition")
+		}
+
+		statusChanged = true
+		needsUpdate = true
 	}
 
-	if notes != "" {
+	// Update notes if provided
+	notesChanged := false
+	if notes != "" && notes != order.Notes {
 		order.Notes = notes
+		notesChanged = true
+		needsUpdate = true
+	}
+
+	// If nothing changed, return early
+	if !needsUpdate {
+		return nil
 	}
 
 	// Update the order in the database
-	return s.orderRepo.UpdateOrder(ctx, order)
+	if statusChanged {
+		err = s.orderRepo.UpdateStatus(ctx, tx, id, newStatus)
+	} else if notesChanged {
+		err = s.orderRepo.Update(ctx, tx, order)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Handle inventory ONLY in UpdateStatus method
+	// Remove inventory handling from here to avoid duplication
+
+	// Commit the transaction
+	return tx.Commit()
 }
 
-func (s *OrderService) verifyInventory(
-	ctx context.Context,
-	merchantID uint,
-	items []SimpleItem,
-) error {
-	return nil
-}
+// func (s *OrderService) verifyInventory(
+// 	ctx context.Context,
+// 	merchantID uint,
+// 	items []SimpleItem,
+// ) error {
+// 	return nil
+// }
 
-func (s *OrderService) updateInventory(
-	ctx context.Context,
-	merchantID uint,
-	items []SimpleItem,
-	orderID uint,
-) error {
-	return nil
-}
+// func (s *OrderService) updateInventory(
+// 	ctx context.Context,
+// 	merchantID uint,
+// 	items []SimpleItem,
+// 	orderID uint,
+// ) error {
+// 	return nil
+// }
 
 func (s *OrderService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
 	return s.ingredientService.CheckProductsAvailability(ctx, productIDs)

@@ -77,7 +77,7 @@ func (s *IngredientService) CheckProductAvailability(ctx context.Context, produc
 	// Check if all ingredients are available in sufficient quantity
 	for _, ingredient := range ingredients {
 		// Get current inventory level for this ingredient
-		inventory, err := s.inventoryRepo.GetByID(ctx, uint(ingredient.IngredientID))
+		inventory, err := s.ingredientRepo.GetByID(ctx, ingredient.IngredientID)
 		if err != nil {
 			return false, err
 		}
@@ -93,7 +93,7 @@ func (s *IngredientService) CheckProductAvailability(ctx context.Context, produc
 
 // CheckProductsAvailability checks availability for multiple products at once
 func (s *IngredientService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
-	return s.inventoryRepo.CheckProductsAvailability(ctx, productIDs)
+	return s.ingredientRepo.CheckProductsAvailability(ctx, productIDs)
 }
 
 // ReserveInventoryForOrder creates inventory reservations for an order
@@ -126,11 +126,8 @@ func (s *IngredientService) CompleteOrderInventory(ctx context.Context, tx *sql.
 }
 
 // CancelOrderInventory returns reserved inventory
-func (s *IngredientService) CancelOrderInventory(ctx context.Context, tx *sql.Tx, orderID uint) error {
-	// 1. Find all 'reserved' reservations for this order
-	// 2. Return quantities back to inventory
-	// 3. Mark reservations as 'canceled'
-	return nil
+func (s *IngredientService) CancelOrderInventory(ctx context.Context, orderID uint) error {
+	return s.ingredientRepo.RestoreInventoryForOrder(ctx, orderID)
 }
 
 // HasSufficientInventoryForOrderWithRaft checks if there is sufficient inventory for an order using Raft

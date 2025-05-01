@@ -186,7 +186,7 @@ func main() {
 	}
 
 	// Use raftOrderService instead of orderService when initializing handlers
-	orderHandler = api.NewOrderHandler(raftOrderService)
+	orderHandler = api.NewOrderHandler(raftOrderService, productService)
 
 	// Create and start the cluster coordinator
 	raftLogger := log.New(os.Stdout, "[RAFT-COORDINATOR] ", log.LstdFlags)

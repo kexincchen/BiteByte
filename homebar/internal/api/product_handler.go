@@ -2,6 +2,10 @@ package api
 
 import (
 	"errors"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/kexincchen/homebar/internal/domain"
+	"github.com/kexincchen/homebar/internal/service"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -137,8 +141,8 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		buf, _ := io.ReadAll(file)
 		data = buf
 	} else if !errors.Is(err, http.ErrMissingFile) {
-		  c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		  return
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	product := &domain.Product{

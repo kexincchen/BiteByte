@@ -1,0 +1,44 @@
+{
+    "api_base_url": "http://localhost:8080/api",
+    "merchant_id": 1,
+    "orders": [
+        {
+            "customer_id": 1,
+            "items": [
+                {
+                    "product_id": 1,
+                    "quantity": 2
+                },
+                {
+                    "product_id": 2,
+                    "quantity": 1
+                }
+            ],
+            "notes": "Test order 1"
+        },
+        {
+            "customer_id": 2,
+            "items": [
+                {
+                    "product_id": 1,
+                    "quantity": 1
+                },
+                {
+                    "product_id": 3,
+                    "quantity": 3
+                }
+            ],
+            "notes": "Test order 2"
+        },
+        {
+            "customer_id": 1,
+            "items": [
+                {
+                    "product_id": 2,
+                    "quantity": 2
+                }
+            ],
+            "notes": "Test order 3"
+        }
+    ]
+}

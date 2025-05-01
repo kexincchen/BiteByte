@@ -217,3 +217,23 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	fmt.Println("order updated successfully")
 	c.Status(http.StatusOK)
 }
+
+// Add a new handler for checking product availability
+func (h *OrderHandler) GetProductsAvailability(c *gin.Context) {
+	var req struct {
+		ProductIDs []uint `json:"product_ids"`
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	availability, err := h.svc.CheckProductsAvailability(c, req.ProductIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check product availability"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"availability": availability})
+}

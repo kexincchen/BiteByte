@@ -42,22 +42,28 @@ func main() {
 	merchantRepo := repository.NewMerchantRepository(dbConn)
 	ingredientRepo := postgres.NewIngredientRepository(dbConn)
 	productIngredientRepo := postgres.NewProductIngredientRepository(dbConn)
+	inventoryRepo := postgres.NewInventoryRepository(dbConn)
 
 	// Initialize services with all repositories
 	userService := service.NewUserService(userRepo, customerRepo, merchantRepo, dbConn)
 	productService := service.NewProductService(productRepo)
-	ingredientService := service.NewIngredientService(ingredientRepo)
+	ingredientService := service.NewIngredientService(
+		ingredientRepo,
+		productIngredientRepo,
+		inventoryRepo,
+	)
 	productIngredientService := service.NewProductIngredientService(productIngredientRepo)
 	orderService := service.NewOrderService(
 		orderRepo,
 		productRepo,
 		ingredientService,
+		inventoryRepo,
 	)
 	merchantService := service.NewMerchantService(merchantRepo)
 
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
-	productHandler := api.NewProductHandler(productService)
+	productHandler := api.NewProductHandler(productService, ingredientService)
 	orderHandler := api.NewOrderHandler(orderService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
 	ingredientHandler := api.NewIngredientHandler(ingredientService)
@@ -96,6 +102,7 @@ func main() {
 			productRoutes.GET("/merchant/:id", productHandler.GetByMerchant)
 			productRoutes.GET("", productHandler.GetAll)
 			productRoutes.GET("/:id/image", productHandler.GetImage)
+			productRoutes.POST("/availability", productHandler.CheckAvailability)
 		}
 
 		// Order routes

@@ -56,7 +56,7 @@ func (h *ProductIngredientHandler) GetByProductID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving product ingredients"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, ingredients)
 }
 
@@ -69,6 +69,7 @@ func (h *ProductIngredientHandler) GetByIngredientID(c *gin.Context) {
 
 // Create adds an ingredient to a product
 func (h *ProductIngredientHandler) Create(c *gin.Context) {
+	fmt.Println("Create Product Ingredient...")
 	var request struct {
 		ProductID    int64   `json:"product_id"`
 		IngredientID int64   `json:"ingredient_id"`
@@ -92,12 +93,6 @@ func (h *ProductIngredientHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
-
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, int64(product.MerchantID)) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
 
 	// Verify the ingredient exists and belongs to the merchant
 	ingredient, err := h.ingredientService.GetIngredientByID(c.Request.Context(), request.IngredientID)

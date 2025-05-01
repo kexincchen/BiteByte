@@ -11,12 +11,12 @@ const ProductForm = ({ isEditing = false }) => {
   const { id } = useParams();
 
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: '',
+    name: "",
+    description: "",
+    price: "",
+    category: "",
     file: null,
-    is_available: true
+    is_available: true,
   });
 
   const [existingImageUrl, setExistingImageUrl] = useState('');
@@ -53,6 +53,7 @@ const ProductForm = ({ isEditing = false }) => {
       if (isEditing && id) {
         try {
           const response = await productAPI.getProduct(id);
+          console.log(response.data);
           setFormData(response.data);
           setFormData({
             name:        response.data.name,
@@ -92,6 +93,7 @@ const ProductForm = ({ isEditing = false }) => {
       if (isEditing && id) {
         try {
           const response = await productIngredientAPI.getProductIngredients(id);
+          console.log(response.data);
           setProductIngredients(response.data || []);
         } catch (error) {
           console.error("Error fetching product ingredients:", error);
@@ -130,7 +132,7 @@ const ProductForm = ({ isEditing = false }) => {
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0] || null;
-    setFormData(prev => ({ ...prev, file }));
+    setFormData((prev) => ({ ...prev, file }));
   };
 
   const handleSubmit = async (e) => {
@@ -147,18 +149,39 @@ const ProductForm = ({ isEditing = false }) => {
     try {
       // Format the data for submission
       const multipart = new FormData();
-      multipart.append('name',        formData.name);
-      multipart.append('description', formData.description);
-      multipart.append('price',       formData.price);
-      multipart.append('category',    formData.category);
-      multipart.append('is_available',formData.is_available);
-      multipart.append('merchant_id', currentUser.merchant_id);
-      if (formData.file) multipart.append('image', formData.file);
+      multipart.append("name", formData.name);
+      multipart.append("description", formData.description);
+      multipart.append("price", formData.price);
+      multipart.append("category", formData.category);
+      multipart.append("is_available", formData.is_available);
+      multipart.append("merchant_id", currentUser.merchant_id);
+      if (formData.file) multipart.append("image", formData.file);
+
+      let productId;
       if (isEditing) {
         await productAPI.updateProduct(id, multipart);
+        productId = id;
       } else {
-        await productAPI.createProduct(multipart);
+        const response = await productAPI.createProduct(multipart);
+        productId = response.data.id;
+      }
 
+      // Process ingredients for the product
+      if (productIngredients.length > 0) {
+        // For new products, or if we've modified ingredients for existing products
+        for (const ingredient of productIngredients) {
+          try {
+            // Use addIngredientToProduct which handles both creates and updates
+            await productIngredientAPI.addIngredientToProduct(productId, {
+              product_id: parseInt(productId),
+              ingredient_id: parseInt(ingredient.ingredient_id),
+              quantity: parseFloat(ingredient.quantity),
+            });
+          } catch (ingredientError) {
+            console.error("Error saving ingredient:", ingredientError);
+            // Continue with other ingredients even if one fails
+          }
+        }
       }
 
       navigate("/merchant/products");
@@ -172,11 +195,14 @@ const ProductForm = ({ isEditing = false }) => {
 
   // Add ingredient to product
   const handleAddIngredient = () => {
+    console.log("Adding ingredient to product: ", selectedIngredient, quantity);
     if (!selectedIngredient || quantity <= 0) return;
 
     const ingredient = ingredients.find(
       (i) => i.id === parseInt(selectedIngredient)
     );
+
+    console.log("Ingredient: ", ingredient);
 
     if (ingredient) {
       const newIngredient = {
@@ -194,6 +220,7 @@ const ProductForm = ({ isEditing = false }) => {
 
   // Remove ingredient from selection
   const handleRemoveIngredient = async (ingredientId) => {
+    console.log("Removing ingredient from product: ", ingredientId);
     if (isEditing) {
       try {
         await productIngredientAPI.removeIngredientFromProduct(
@@ -213,6 +240,7 @@ const ProductForm = ({ isEditing = false }) => {
 
   // Update ingredient quantity
   const handleQuantityChange = (ingredientId, newQuantity) => {
+    console.log("Updating ingredient quantity: ", ingredientId, newQuantity);
     setProductIngredients(
       productIngredients.map((item) =>
         item.ingredient_id === ingredientId
@@ -220,7 +248,7 @@ const ProductForm = ({ isEditing = false }) => {
           : item
       )
     );
-  
+
     // If editing, update on the server
     if (isEditing) {
       const updatedItem = productIngredients.find(

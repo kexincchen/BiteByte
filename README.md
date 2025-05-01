@@ -166,3 +166,18 @@ npm install
 npm start
 ```
 
+## Start the Raft cluster
+
+```bash
+bash homebar/scripts/monitor_raft.sh
+```
+
+## Run the server with multiple nodes
+
+```
+NODE_ID=1 PORT=8080 go run cmd/server/main.go
+NODE_ID=2 PORT=8081 go run cmd/server/main.go
+NODE_ID=3 PORT=8082 go run cmd/server/main.go
+```
+
+

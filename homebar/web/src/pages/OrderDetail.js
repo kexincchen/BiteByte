@@ -11,18 +11,14 @@ const OrderDetail = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // If order was passed via navigation state, use it
-    if (location.state?.order) {
-      setOrder(location.state.order);
-      setLoading(false);
-      return;
-    }
-
-    // Otherwise fetch from API
-    const fetchOrder = async () => {
+    const fetchOrderDetails = async () => {
       try {
         const response = await orderAPI.getOrder(id);
-        setOrder(response.data);
+        const { order, items } = response.data;
+        setOrder({
+          ...order,
+          items: items
+        });
         setLoading(false);
       } catch (error) {
         console.error('Error fetching order:', error);
@@ -31,8 +27,8 @@ const OrderDetail = () => {
       }
     };
 
-    fetchOrder();
-  }, [id, location.state]);
+    fetchOrderDetails();
+  }, [id]);
 
   if (loading) return <div>Loading order details...</div>;
   if (error) return <div className="error">{error}</div>;
@@ -64,15 +60,17 @@ const OrderDetail = () => {
           <thead>
             <tr>
               <th>Item</th>
+              <th>Description</th>
               <th>Quantity</th>
               <th>Price</th>
               <th>Subtotal</th>
             </tr>
           </thead>
           <tbody>
-            {order.items?.map(item => (
+            {order.items.map(item => (
               <tr key={item.id}>
                 <td>{item.product_name}</td>
+                <td>{item.product_description}</td>
                 <td>{item.quantity}</td>
                 <td>${item.price.toFixed(2)}</td>
                 <td>${(item.price * item.quantity).toFixed(2)}</td>
@@ -81,7 +79,7 @@ const OrderDetail = () => {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan="3" align="right"><strong>Total:</strong></td>
+              <td colSpan="4" align="right"><strong>Total:</strong></td>
               <td><strong>${order.total_amount.toFixed(2)}</strong></td>
             </tr>
           </tfoot>

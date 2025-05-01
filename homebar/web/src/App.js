@@ -18,6 +18,7 @@ import MerchantAddProduct from "./pages/merchant/AddProduct";
 import MerchantEditProduct from "./pages/merchant/EditProduct";
 import MerchantOrders from "./pages/merchant/Orders";
 import MerchantInventory from "./pages/merchant/Inventory";
+import MerchantOrderDetail from "./pages/merchant/OrderDetail";
 import AddIngredient from "./pages/merchant/AddIngredient";
 import EditIngredient from "./pages/merchant/EditIngredient";
 import ProductIngredients from "./pages/merchant/ProductIngredients";
@@ -62,10 +63,17 @@ function App() {
                   path="/merchant/products/edit/:id"
                   element={<MerchantEditProduct />}
                 />
-                <Route path="/merchant/orders" element={<MerchantOrders />} />
+                <Route
+                    path="/merchant/orders"
+                    element={<MerchantOrders />}
+                />
                 <Route
                   path="/merchant/inventory"
                   element={<MerchantInventory />}
+                />
+                <Route
+                    path="/merchant/orders/:id"
+                    element={<MerchantOrderDetail />}
                 />
                 <Route
                   path="/merchant/inventory/add"

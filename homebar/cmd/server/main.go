@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -195,14 +196,22 @@ func main() {
 	clusterCoordinator.RegisterNode(raftOrderService.GetRaftNode())
 
 	// Start the coordinator
-	if err := clusterCoordinator.Start(ctx); err != nil {
+	if err := clusterCoordinator.Start(ctx, nodeID); err != nil {
 		log.Fatalf("Failed to start cluster coordinator: %v", err)
 	}
 	defer clusterCoordinator.Stop()
 
 	// Start the HTTP server (this will block)
-	log.Println("Starting server on :8080")
-	if err := router.Run(":8080"); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Default port if not specified
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
+
+	log.Printf("Starting server on %s", port)
+	if err := router.Run(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

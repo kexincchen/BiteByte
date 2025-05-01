@@ -69,9 +69,9 @@ func (c *ClusterCoordinator) RegisterNode(node *RaftNode) {
 }
 
 // Start begins the coordinator's monitoring and management tasks
-func (c *ClusterCoordinator) Start(ctx context.Context) error {
+func (c *ClusterCoordinator) Start(ctx context.Context, nodeID string) error {
 	// Start HTTP server for admin API
-	c.startHTTPServer()
+	c.startHTTPServer(nodeID)
 
 	// Start periodic health checks and state updates
 	go c.runMonitoring(ctx)
@@ -195,7 +195,7 @@ func (c *ClusterCoordinator) updateClusterState() {
 }
 
 // startHTTPServer starts an HTTP server for administrative API endpoints
-func (c *ClusterCoordinator) startHTTPServer() {
+func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 	mux := http.NewServeMux()
 
 	// Add endpoints for cluster management
@@ -205,7 +205,6 @@ func (c *ClusterCoordinator) startHTTPServer() {
 		w.WriteHeader(http.StatusOK)
 
 		state := c.GetClusterState()
-		// In a real implementation, we would marshal the state to JSON
 		fmt.Fprintf(w, `{"leader":"%s","term":%d,"nodes":%d}`,
 			state.LeaderID, state.Term, len(state.Nodes))
 	})
@@ -216,13 +215,15 @@ func (c *ClusterCoordinator) startHTTPServer() {
 		w.WriteHeader(http.StatusOK)
 
 		state := c.GetClusterState()
-		// In a real implementation, we would marshal the nodes to JSON
 		fmt.Fprintf(w, `{"count":%d}`, len(state.Nodes))
 	})
 
+	// Use a different coordinator port for each node
+	coordPort := 8090 + int(nodeID[0]-'0') // Assumes nodeID is a single digit
+
 	// Start the HTTP server
 	c.httpServer = &http.Server{
-		Addr:    ":8090", // Admin port
+		Addr:    fmt.Sprintf(":%d", coordPort),
 		Handler: mux,
 	}
 

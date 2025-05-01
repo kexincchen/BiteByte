@@ -43,7 +43,7 @@ const ProductDetail = () => {
       <div className="product-detail-container">
         <div className="product-image-container">
           <img
-              src={`http://localhost:8080/api/products/${product.id}/image`}
+              src={productAPI.imageUrl(product.id)}
               alt={product.name}
               onError={(e) => {
                 e.target.src = '/placeholder.png'

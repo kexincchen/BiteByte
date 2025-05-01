@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Base API URL - in a real app, you'd use environment variables
-const API_URL = "http://localhost:8080/api";
+export const API_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:8080/api";
 
 // Create an axios instance with default config
 const apiClient = axios.create({
@@ -55,6 +55,8 @@ export const productAPI = {
   getProductsByMerchant: (merchantId) => {
     return apiClient.get(`/products/merchant/${merchantId}`);
   },
+  imageUrl: (id, bust = true) =>
+      `${API_URL}/products/${id}/image${bust ? `?ts=${Date.now()}` : ""}`,
 };
 
 // Order API

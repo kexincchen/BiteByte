@@ -106,11 +106,15 @@ CREATE INDEX IF NOT EXISTS idx_ingredients_merchant_id ON ingredients(merchant_i
 
 -- Create product_ingredients table
 CREATE TABLE IF NOT EXISTS product_ingredients (
+    id SERIAL PRIMARY KEY,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
     quantity NUMERIC(10, 2) NOT NULL,
-    PRIMARY KEY (product_id, ingredient_id)
 );
+
+ALTER TABLE product_ingredients 
+ADD CONSTRAINT unique_product_ingredient 
+UNIQUE (product_id, ingredient_id);
 
 -- Create indexes for faster lookups
 CREATE INDEX IF NOT EXISTS idx_product_ingredients_product_id ON product_ingredients(product_id);

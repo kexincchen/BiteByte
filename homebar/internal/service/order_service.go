@@ -8,16 +8,18 @@ import (
 
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/repository"
+	"github.com/kexincchen/homebar/internal/repository/postgres"
 )
 
 type OrderService struct {
 	orderRepo         repository.OrderRepository
 	productRepo       repository.ProductRepository
 	ingredientService *IngredientService
+	inventoryRepo     *postgres.InventoryRepository
 }
 
-func NewOrderService(or repository.OrderRepository, pr repository.ProductRepository, ingredientService *IngredientService) *OrderService {
-	return &OrderService{or, pr, ingredientService}
+func NewOrderService(or repository.OrderRepository, pr repository.ProductRepository, ingredientService *IngredientService, inventoryRepo *postgres.InventoryRepository) *OrderService {
+	return &OrderService{or, pr, ingredientService, inventoryRepo}
 }
 
 type SimpleItem struct {
@@ -141,4 +143,8 @@ func (s *OrderService) updateInventory(
 	orderID uint,
 ) error {
 	return nil
+}
+
+func (s *OrderService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
+	return s.ingredientService.CheckProductsAvailability(ctx, productIDs)
 }

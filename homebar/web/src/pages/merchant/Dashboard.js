@@ -111,8 +111,8 @@ const Dashboard = () => {
             merchantId
           );
           console.log("Inventory response: ", inventoryResponse);
-          if (inventoryResponse.ok) {
-            const inventoryData = await inventoryResponse.json();
+          if (inventoryResponse.status >= 200 && inventoryResponse.status < 300) {
+            const inventoryData = await inventoryResponse.data;
             console.log("Inventory response: ", inventoryData);
             setIngredientStats({
               total: inventoryData.totalIngredients || 0,

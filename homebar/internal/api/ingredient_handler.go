@@ -104,7 +104,7 @@ func (h *IngredientHandler) GetByID(c *gin.Context) {
 // Update handles updating an ingredient
 func (h *IngredientHandler) Update(c *gin.Context) {
 	// Get ingredient ID from URL
-	ingredientID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	ingredientID, err := strconv.ParseInt(c.Param("ingredientId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ingredient ID"})
 		return
@@ -166,11 +166,12 @@ func (h *IngredientHandler) Update(c *gin.Context) {
 // Delete handles deleting an ingredient
 func (h *IngredientHandler) Delete(c *gin.Context) {
 	// Get ingredient ID from URL
-	ingredientID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	ingredientID, err := strconv.ParseInt(c.Param("ingredientId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ingredient ID"})
 		return
 	}
+	fmt.Println("Ingredient ID: ", ingredientID)
 
 	// Get merchant ID from URL
 	merchantID, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -187,7 +188,9 @@ func (h *IngredientHandler) Delete(c *gin.Context) {
 
 	// Get the existing ingredient to verify ownership
 	existingIngredient, err := h.ingredientService.GetIngredientByID(c.Request.Context(), ingredientID)
+	fmt.Println("Existing ingredient: ", existingIngredient)
 	if err != nil {
+		fmt.Println("Error retrieving ingredient: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving ingredient"})
 		return
 	}
@@ -205,6 +208,7 @@ func (h *IngredientHandler) Delete(c *gin.Context) {
 
 	// Delete the ingredient
 	if err := h.ingredientService.DeleteIngredient(c.Request.Context(), ingredientID); err != nil {
+		fmt.Println("Error deleting ingredient: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting ingredient"})
 		return
 	}
@@ -266,22 +270,22 @@ func (h *IngredientHandler) GetInventorySummary(c *gin.Context) {
 
 // Helper method to authorize merchant access
 func (h *IngredientHandler) authorizeMerchant(c *gin.Context, merchantID int64) bool {
-	// Get the user from context
-	userRaw, exists := c.Get("user")
+	// Get the merchant from context
+	merchantRaw, exists := c.Get("merchant")
 	if !exists {
-		fmt.Println("User not found in context")
+		fmt.Println("Merchant not found in context")
 		return false
 	}
 
-	user, ok := userRaw.(*domain.User)
-	if !ok || user == nil {
-		fmt.Println("User is not a domain.User")
+	merchant, ok := merchantRaw.(*domain.Merchant)
+	if !ok || merchant == nil {
+		fmt.Println("Merchant is not a domain.Merchant")
 		return false
 	}
 
 	// Check if user is a merchant and matches the merchant ID
-	if user.Role != "merchant" || user.ID != uint(merchantID) {
-		fmt.Println("User is not a merchant or does not match merchant ID")
+	if merchant.ID != uint(merchantID) {
+		fmt.Println("Merchant does not match merchant ID")
 		return false
 	}
 

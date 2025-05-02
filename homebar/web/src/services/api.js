@@ -1,25 +1,60 @@
 import axios from "axios";
 
-// Base API URL - in a real app, you'd use environment variables
-export const API_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:8080/api";
+const HOSTS = (
+    process.env.REACT_APP_SERVER_URLS ||
+    'http://localhost:9001,http://localhost:9002,http://localhost:9003'
+).split(',').map(h => h.trim()).filter(Boolean);
 
-// Create an axios instance with default config
-const apiClient = axios.create({
-  baseURL: API_URL,
-});
+let currIdx = 0;
 
-// Add a request interceptor to attach the auth token to every request
+function setBase(i) {
+  currIdx = (i + HOSTS.length) % HOSTS.length;
+  apiClient.defaults.baseURL = `${HOSTS[currIdx]}/api`;
+}
+function rotateBase() { setBase(currIdx + 1); }
+function getBaseURL() { return apiClient.defaults.baseURL; }
+
+const apiClient = axios.create();
+setBase(0);
+
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    config => {
+      const token = localStorage.getItem('token');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      return config;
+    },
+    error => Promise.reject(error)
+);
+
+apiClient.interceptors.response.use(
+    res => res,
+    async err => {
+      if (!err.response) {
+        const tried = currIdx;
+        rotateBase();
+        if (currIdx !== tried) {
+          err.config.baseURL = getBaseURL();
+          return apiClient(err.config);
+        }
+      }
+
+      if (err.response && err.response.status === 307) {
+        const loc = err.response.headers.location || '';
+        try {
+          const origin = new URL(loc).origin;
+          const idx = HOSTS.indexOf(origin);
+          if (idx !== -1) {
+            setBase(idx);
+          } else {
+            apiClient.defaults.baseURL = origin + '/api';
+          }
+          err.config.baseURL = getBaseURL();
+          return apiClient(err.config);
+        } catch {  }
+      }
+
+      return Promise.reject(err);
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
 );
 
 // Auth API
@@ -61,7 +96,7 @@ export const productAPI = {
     });
   },
   imageUrl: (id, bust = true) =>
-    `${API_URL}/products/${id}/image${bust ? `?ts=${Date.now()}` : ""}`,
+    `${getBaseURL()}/products/${id}/image${bust ? `?ts=${Date.now()}` : ""}`,
 };
 
 // Order API
@@ -170,15 +205,4 @@ export const productIngredientAPI = {
       quantity,
     });
   },
-};
-
-export default {
-  auth: authAPI,
-  products: productAPI,
-  orders: orderAPI,
-  user: userAPI,
-  cart: cartAPI,
-  merchants: merchantAPI,
-  ingredients: ingredientAPI,
-  productIngredients: productIngredientAPI,
 };

@@ -28,6 +28,7 @@ func NewRaftOrderService(
 	orderService *OrderService,
 	nodeID string,
 	peerIDs []string,
+	peerAddrs map[string]string,
 ) (*RaftOrderService, error) {
 	logger := log.New(os.Stdout, fmt.Sprintf("[RAFT-%s] ", nodeID), log.LstdFlags)
 
@@ -45,6 +46,7 @@ func NewRaftOrderService(
 	raftNode := raft.NewRaftNode(
 		nodeID,
 		peerIDs,
+		peerAddrs,
 		applyCh,
 		service.applyCommand,
 		logger,

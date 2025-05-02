@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"os/signal"
+	"syscall"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -25,6 +28,11 @@ import (
 )
 
 func main() {
+
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
+
 	// Initialize configuration
 	cfg := config.Load()
 	dbConn, err := db.NewPostgres(cfg)
@@ -78,7 +86,7 @@ func main() {
 	)
 
 	// Setup router
-	router := gin.Default()
+	router = gin.Default()
 
 	// Enable CORS middleware
 	router.Use(corsMiddleware())
@@ -167,12 +175,31 @@ func main() {
 	// In a real system, this would be dynamically discovered or configured
 	peerIDs := []string{"1", "2", "3"}
 
+	peerMap := map[string]string{}
+	if env := os.Getenv("RAFT_PEERS"); env != "" {
+		for _, kv := range strings.Split(env, ",") {
+			p := strings.SplitN(kv, "=", 2)
+			if len(p) == 2 {
+				peerMap[p[0]] = p[1]
+			}
+		}
+	}
+
 	// Create Raft-enabled order service
 	raftOrderService, err := service.NewRaftOrderService(
 		orderService,
 		nodeID,
 		peerIDs,
+		peerMap,
 	)
+
+	raftNode := raftOrderService.GetRaftNode()
+	rpcSrv := raft.SetupRaftRPCServer(raftNode)
+	go func() {
+		if err := rpcSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Raft RPC listen error: %v", err)
+		}
+	}()
 
 	if err != nil {
 		log.Fatalf("Failed to create Raft order service: %v", err)
@@ -210,10 +237,27 @@ func main() {
 		port = ":" + port
 	}
 
-	log.Printf("Starting server on %s", port)
-	if err := router.Run(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := &http.Server{
+		Addr:    port,
+		Handler: router,
 	}
+
+	go func() {
+		log.Printf("Serving on %s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit // 等待 Ctrl-C
+	log.Println("Shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(shutdownCtx)
+	cancel()
 }
 
 // CORS middleware to allow frontend to access the API

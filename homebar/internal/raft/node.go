@@ -15,6 +15,7 @@ type RaftNode struct {
 	state       NodeState
 	id          string
 	peers       map[string]*RaftPeer
+	peerAddrs   map[string]string
 	currentTerm uint64
 	votedFor    string
 	log         []LogEntry
@@ -44,10 +45,11 @@ type RaftNode struct {
 }
 
 // NewRaftNode creates a new Raft node with the given configuration
-func NewRaftNode(id string, peers []string, applyCh chan LogEntry, applyCommand func(cmd interface{}) error, logger *log.Logger) *RaftNode {
+func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh chan LogEntry, applyCommand func(cmd interface{}) error, logger *log.Logger) *RaftNode {
 	node := &RaftNode{
 		id:                id,
 		peers:             make(map[string]*RaftPeer),
+		peerAddrs:         peerAddrs,
 		log:               []LogEntry{{Term: 0, Index: 0}}, // Start with a dummy entry
 		applyCh:           applyCh,
 		currentTerm:       0,
@@ -80,7 +82,11 @@ func (n *RaftNode) Start(ctx context.Context) error {
 
 	// Initialize peer connections
 	for id, peer := range n.peers {
-		client, err := NewRaftClient(id)
+		addr := n.peerAddrs[id]
+		if addr == "" {
+			addr = fmt.Sprintf("http://localhost:808%s/raft", id)
+		}
+		client, err := NewRaftClient(id, addr)
 		if err != nil {
 			return fmt.Errorf("failed to connect to peer %s: %w", id, err)
 		}

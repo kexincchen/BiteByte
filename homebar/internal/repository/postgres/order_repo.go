@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/kexincchen/homebar/internal/domain"
 )
@@ -73,7 +74,7 @@ func (r *OrderRepo) GetByID(ctx context.Context, id uint) (*domain.Order, []doma
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
 		if err != nil {
-
+			log.Printf("Error closing rows: %v", err)
 		}
 	}(rows)
 	var list []domain.OrderItem
@@ -105,7 +106,7 @@ func (r *OrderRepo) list(ctx context.Context, where string, arg interface{}) ([]
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
 		if err != nil {
-
+			log.Printf("Error closing rows: %v", err)
 		}
 	}(rows)
 	var list []*domain.Order
@@ -156,4 +157,3 @@ func (r *OrderRepo) Update(ctx context.Context, tx *sql.Tx, order *domain.Order)
 func (r *OrderRepo) GetDB() *sql.DB {
 	return r.db
 }
-

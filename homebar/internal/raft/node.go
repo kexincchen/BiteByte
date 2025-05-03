@@ -399,9 +399,9 @@ func (n *RaftNode) Submit(command interface{}) (uint64, error) {
 	defer n.mu.Unlock()
 
 	// If not the leader, reject the command
-	if n.state != Leader {
-		return 0, fmt.Errorf("not the leader")
-	}
+	// if n.state != Leader {
+	// 	return 0, fmt.Errorf("not the leader")
+	// }
 
 	// Append to log
 	index := uint64(len(n.log))
@@ -412,6 +412,7 @@ func (n *RaftNode) Submit(command interface{}) (uint64, error) {
 	}
 
 	n.log = append(n.log, entry)
+	n.logger.Printf("🔄 Node %s submitted command at index %d", n.id, index)
 
 	// Send the new entry to all peers immediately
 	go n.sendHeartbeats()

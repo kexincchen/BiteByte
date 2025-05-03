@@ -273,6 +273,9 @@ func (r *IngredientRepository) CheckProductsAvailability(ctx context.Context, pr
 // LockInventoryForOrder attempts to lock inventory for an order
 // Returns false if there's not enough inventory
 func (r *IngredientRepository) LockInventoryForOrder(ctx context.Context, orderItems []*domain.OrderItem) (bool, error) {
+	fmt.Printf("DEBUG: Checking inventory for %d items\n", len(orderItems))
+	fmt.Printf("DEBUG: Order items: %v\n", orderItems)
+	
 	// Start a transaction
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

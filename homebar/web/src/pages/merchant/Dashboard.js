@@ -209,6 +209,7 @@ const Dashboard = () => {
     try {
       // First set status to cancelled
       await orderAPI.updateOrderStatus(orderId, "cancelled");
+      await orderAPI.deleteOrder(orderId);
 
       // Then remove from local state
       setRecentOrders(recentOrders.filter((order) => order.id !== orderId));

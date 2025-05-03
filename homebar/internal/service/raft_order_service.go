@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/kexincchen/homebar/internal/domain"
@@ -15,12 +16,14 @@ import (
 
 // RaftOrderService wraps OrderService to provide distributed consensus
 type RaftOrderService struct {
-	orderService *OrderService
-	raftNode     *raft.RaftNode
-	applyCh      chan raft.LogEntry
-	nodeID       string
-	isLeader     bool
-	logger       *log.Logger
+	orderService  *OrderService
+	raftNode      *raft.RaftNode
+	applyCh       chan raft.LogEntry
+	nodeID        string
+	isLeader      bool
+	logger        *log.Logger
+	resultMap     map[uint64]*domain.Order
+	resultMapLock sync.Mutex
 }
 
 // NewRaftOrderService creates a new Raft-enabled order service
@@ -40,6 +43,7 @@ func NewRaftOrderService(
 		nodeID:       nodeID,
 		isLeader:     false,
 		logger:       logger,
+		resultMap:    make(map[uint64]*domain.Order),
 	}
 
 	// Create the Raft node
@@ -48,7 +52,11 @@ func NewRaftOrderService(
 		peerIDs,
 		peerAddrs,
 		applyCh,
-		service.applyCommand,
+		// service.applyCommand,
+		func(cmd interface{}) error {
+			_, err := service.applyCommand(cmd)
+			return err
+		},
 		logger,
 	)
 
@@ -62,6 +70,10 @@ func NewRaftOrderService(
 
 // Start initializes and starts the Raft node
 func (s *RaftOrderService) Start(ctx context.Context) error {
+	// Start the cleanup goroutine
+	go s.cleanupResults()
+
+	// Start the Raft node
 	return s.raftNode.Start(ctx)
 }
 
@@ -73,34 +85,35 @@ func (s *RaftOrderService) CreateOrder(
 	notes string,
 ) (*domain.Order, error) {
 	// Prepare the order command
-	orderItems := make([]map[string]interface{}, 0, len(items))
-	for _, item := range items {
-		orderItems = append(orderItems, map[string]interface{}{
-			"product_id": item.ProductID,
-			"quantity":   item.Quantity,
-			"price":      item.Price,
-		})
+	// Convert the map slice to the expected type
+	raftItems := make([]raft.OrderItemCommand, len(items))
+	for i, item := range items {
+		raftItems[i] = raft.OrderItemCommand{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+			Price:     item.Price,
+		}
 	}
 
 	cmd := raft.OrderCommand{
 		Type:       "create_order",
 		CustomerID: customerID,
 		MerchantID: merchantID,
-		OrderItems: orderItems,
+		OrderItems: raftItems,
 		AdditionalData: map[string]interface{}{
 			"notes": notes,
 		},
 	}
-
+	fmt.Printf("DEBUG: Submitting order to Raft: %v\n", cmd)
 	// Submit the command to Raft
 	index, err := s.raftNode.Submit(cmd)
+	fmt.Printf("DEBUG: Submitted order to Raft: index=%d, err=%v\n", index, err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit order to Raft: %w", err)
 	}
 
 	// Wait for the command to be applied
-	// In a real system, we would have a more sophisticated waiting mechanism
-	// This is a simplified approach
+	fmt.Printf("DEBUG: Waiting for order to be applied\n")
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -108,51 +121,74 @@ func (s *RaftOrderService) CreateOrder(
 	for {
 		select {
 		case <-ticker.C:
+			fmt.Printf("DEBUG: Ticker ticked\n")
 			// Check if the command has been applied
 			s.updateLastApplied(index)
 
-			// Retrieve the order that was created
-			// This assumes the command was successfully applied
-			// In a real system, we would track command results more carefully
-			order, _, err := s.orderService.GetByID(ctx, cmd.OrderID)
-			return order, err
+			// Check if the command has been applied
+			s.resultMapLock.Lock()
+			order, exists := s.resultMap[index]
+			if exists {
+				// Delete the result from the cache to avoid memory leaks
+				delete(s.resultMap, index)
+				s.resultMapLock.Unlock()
+				fmt.Printf("DEBUG: Retrieved order from result cache: %v\n", order)
+				return order, nil
+			}
+			s.resultMapLock.Unlock()
 
 		case <-timeout:
+			fmt.Printf("DEBUG: Timeout waiting for order creation\n")
 			return nil, errors.New("timeout waiting for order creation")
 
 		case <-ctx.Done():
+			fmt.Printf("DEBUG: Context done\n")
 			return nil, ctx.Err()
 		}
 	}
 }
 
 // applyCommand applies a Raft command to the state machine
-func (s *RaftOrderService) applyCommand(cmdInterface interface{}) error {
+func (s *RaftOrderService) applyCommand(cmdInterface interface{}) (*domain.Order, error) {
+	var createdOrder *domain.Order = nil
 	// Convert the interface to an OrderCommand
 	cmdBytes, err := json.Marshal(cmdInterface)
+	fmt.Printf("DEBUG: cmdBytes: %v\n", string(cmdBytes))
 	if err != nil {
-		return fmt.Errorf("failed to marshal command: %w", err)
+		return nil, fmt.Errorf("failed to marshal command: %w", err)
 	}
 
 	var cmd raft.OrderCommand
 	if err := json.Unmarshal(cmdBytes, &cmd); err != nil {
-		return fmt.Errorf("failed to unmarshal command: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal command: %w", err)
 	}
+
+	fmt.Printf("DEBUG: cmd: %v\n", cmd)
 
 	ctx := context.Background()
 
 	switch cmd.Type {
 	case "create_order":
-		// Convert order items from interface to SimpleItem
-		var items []SimpleItem
-		itemsData, err := json.Marshal(cmd.OrderItems)
-		if err != nil {
-			return fmt.Errorf("failed to marshal order items: %w", err)
+		// Convert from OrderItemCommand to SimpleItem directly
+		items := make([]SimpleItem, len(cmd.OrderItems))
+		for i, item := range cmd.OrderItems {
+			items[i] = SimpleItem{
+				ProductID: item.ProductID,
+				Quantity:  item.Quantity,
+				Price:     item.Price,
+			}
 		}
+		// // Convert order items from interface to SimpleItem
+		// var items []SimpleItem
+		// itemsData, err := json.Marshal(cmd.OrderItems)
+		// fmt.Println("itemsData", string(itemsData))
+		// if err != nil {
+		// 	return fmt.Errorf("failed to marshal order items: %w", err)
+		// }
 
-		if err := json.Unmarshal(itemsData, &items); err != nil {
-			return fmt.Errorf("failed to unmarshal order items: %w", err)
-		}
+		// if err := json.Unmarshal(itemsData, &items); err != nil {
+		// 	return fmt.Errorf("failed to unmarshal order items: %w", err)
+		// }
 
 		notes := ""
 		if notesVal, ok := cmd.AdditionalData["notes"]; ok {
@@ -162,23 +198,59 @@ func (s *RaftOrderService) applyCommand(cmdInterface interface{}) error {
 		}
 
 		// Call the underlying service to create the order
+		fmt.Printf("DEBUG: cmd.CustomerID: %v\n", cmd.CustomerID)
+		fmt.Printf("DEBUG: cmd.MerchantID: %v\n", cmd.MerchantID)
+		fmt.Printf("DEBUG: items: %v\n", items)
+		fmt.Printf("DEBUG: notes: %v\n", notes)
 		order, err := s.orderService.CreateOrder(ctx, cmd.CustomerID, cmd.MerchantID, items, notes)
+		fmt.Printf("DEBUG: Order created: %v\n", order)
 		if err != nil {
-			return fmt.Errorf("failed to create order: %w", err)
+			return nil, fmt.Errorf("failed to create order: %w", err)
 		}
 
 		// Store the order ID in the command for reference
 		cmd.OrderID = order.ID
+		createdOrder = order
+		fmt.Printf("DEBUG: cmd.OrderID: %v\n", cmd.OrderID)
+
+	case "update_order_status":
+		// Get the status from additional data
+		statusStr, ok := cmd.AdditionalData["status"].(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid status in update_order_status command")
+		}
+
+		// Convert string to OrderStatus
+		status := domain.OrderStatus(statusStr)
+
+		// Call the underlying service to update the order status
+		if err := s.orderService.UpdateStatus(ctx, cmd.OrderID, status); err != nil {
+			return nil, fmt.Errorf("failed to update order status: %w", err)
+		}
+
+		// For status updates, we don't need to return the order
+		return nil, nil
+
+	case "update_order":
+		// Handle the update_order command too
+		statusStr, _ := cmd.AdditionalData["status"].(string)
+		notesStr, _ := cmd.AdditionalData["notes"].(string)
+
+		if err := s.orderService.UpdateOrder(ctx, cmd.OrderID, statusStr, notesStr); err != nil {
+			return nil, fmt.Errorf("failed to update order: %w", err)
+		}
+
+		return nil, nil
 
 	case "update_inventory":
 		// Process inventory updates without orders
 		// This would be implemented similarly to create_order
 
 	default:
-		return fmt.Errorf("unknown command type: %s", cmd.Type)
+		return nil, fmt.Errorf("unknown command type: %s", cmd.Type)
 	}
 
-	return nil
+	return createdOrder, nil
 }
 
 // processAppliedCommands listens for applied log entries and processes them
@@ -187,8 +259,19 @@ func (s *RaftOrderService) processAppliedCommands() {
 		// Log that we received a command for auditing
 		s.logger.Printf("Applied command at index %d, term %d", entry.Index, entry.Term)
 
-		// Commands are applied directly by the applyCommand function
-		// This loop exists mainly for logging and monitoring
+		// Apply the command directly and store the result
+		order, err := s.applyCommand(entry.Command)
+		if err != nil {
+			s.logger.Printf("Error applying command: %v", err)
+			continue
+		}
+
+		// If it's an order creation command and the order was created successfully, store the result
+		if order != nil {
+			s.resultMapLock.Lock()
+			s.resultMap[entry.Index] = order
+			s.resultMapLock.Unlock()
+		}
 	}
 }
 
@@ -257,4 +340,20 @@ func (s *RaftOrderService) GetRaftNode() *raft.RaftNode {
 
 func (s *RaftOrderService) updateLastApplied(index uint64) {
 	s.raftNode.UpdateLastApplied(index)
+}
+
+// CleanupResults cleans up the result map
+func (s *RaftOrderService) cleanupResults() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		s.resultMapLock.Lock()
+		// Clean up based on time or maximum number
+		// Here we simplify the cleanup, in actual use, it should be more refined
+		if len(s.resultMap) > 1000 {
+			s.resultMap = make(map[uint64]*domain.Order)
+		}
+		s.resultMapLock.Unlock()
+	}
 }

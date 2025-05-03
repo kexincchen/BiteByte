@@ -357,3 +357,9 @@ func (s *RaftOrderService) cleanupResults() {
 		s.resultMapLock.Unlock()
 	}
 }
+
+// DeleteOrder deletes an order with Raft consensus
+func (s *RaftOrderService) DeleteOrder(ctx context.Context, id uint) error {
+	// No need to delete order with Raft, just use the underlying service
+	return s.orderService.DeleteOrder(ctx, id)
+}

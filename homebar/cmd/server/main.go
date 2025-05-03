@@ -154,6 +154,7 @@ func main() {
 			orderRoutes.GET("/:id", orderHandler.GetByID)
 			orderRoutes.PUT("/:id/status", orderHandler.UpdateStatus)
 			orderRoutes.PUT("/:id", orderHandler.UpdateOrder)
+			orderRoutes.DELETE("/:id", orderHandler.Delete)
 		}
 
 		// Merchant routes
@@ -193,7 +194,6 @@ func main() {
 			"status": "ok",
 		})
 	})
-
 
 	raftNode := raftOrderService.GetRaftNode()
 	rpcSrv := raft.SetupRaftRPCServer(raftNode)

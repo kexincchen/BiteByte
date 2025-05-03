@@ -153,7 +153,20 @@ func (r *OrderRepo) Update(ctx context.Context, tx *sql.Tx, order *domain.Order)
 	return err
 }
 
-// GetDB returns the database connection
+// Delete removes an order and its items from the database
+func (r *OrderRepo) Delete(ctx context.Context, tx *sql.Tx, id uint) error {
+	// Delete order items first due to foreign key constraints
+	_, err := tx.ExecContext(ctx, `DELETE FROM order_items WHERE order_id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	// Then delete the order
+	_, err = tx.ExecContext(ctx, `DELETE FROM orders WHERE id = $1`, id)
+	return err
+}
+
+// GetDB returns the underlying database connection
 func (r *OrderRepo) GetDB() *sql.DB {
 	return r.db
 }

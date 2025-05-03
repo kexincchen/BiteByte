@@ -54,6 +54,7 @@ type OrderRepository interface {
 	UpdateStatus(ctx context.Context, tx *sql.Tx, id uint, st domain.OrderStatus) error
 	Update(ctx context.Context, tx *sql.Tx, order *domain.Order) error
 	GetDB() *sql.DB
+	Delete(ctx context.Context, tx *sql.Tx, id uint) error
 }
 
 type IngredientRepository interface {

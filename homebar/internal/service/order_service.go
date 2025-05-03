@@ -248,3 +248,36 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, 
 func (s *OrderService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
 	return s.ingredientService.CheckProductsAvailability(ctx, productIDs)
 }
+
+// DeleteOrder deletes an order by ID
+func (s *OrderService) DeleteOrder(ctx context.Context, id uint) error {
+	// First get the order to check its status
+	order, _, err := s.orderRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Only completed or cancelled orders can be deleted directly
+	if order.Status == domain.OrderStatusPending {
+		// Cancel the order
+		err = s.UpdateStatus(ctx, id, domain.OrderStatusCancelled)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Start transaction
+	tx, err := s.orderRepo.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete the order
+	if err := s.orderRepo.Delete(ctx, tx, id); err != nil {
+		return err
+	}
+
+	// Commit the transaction
+	return tx.Commit()
+}

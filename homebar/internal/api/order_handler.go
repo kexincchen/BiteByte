@@ -259,3 +259,33 @@ func (h *OrderHandler) GetProductsAvailability(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"availability": availability})
 }
+
+// Delete DELETE /api/orders/:id
+func (h *OrderHandler) Delete(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	// Get the order first to check if it exists
+	order, _, err := h.orderService.GetByID(c, uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Check the order status
+	if order.Status == domain.OrderStatusPending {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete a pending order; cancel it first"})
+		return
+	}
+
+	// Delete the order
+	if err := h.orderService.DeleteOrder(c, uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}

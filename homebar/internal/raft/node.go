@@ -171,6 +171,8 @@ func (n *RaftNode) becomeCandidate() {
 func (n *RaftNode) becomeLeader() {
 	n.state = Leader
 
+	n.logger.Printf("👑 Node %s becomes LEADER for term %d", n.id, n.currentTerm)
+
 	// Initialize nextIndex and matchIndex
 	lastLogIndex := uint64(len(n.log) - 1)
 	for peerID := range n.peers {
@@ -192,6 +194,9 @@ func (n *RaftNode) startElection() {
 
 	// Vote for self
 	votesReceived := 1
+
+	participants := 1
+	n.logger.Printf("⏳ Node %s starts election for term %d", n.id, n.currentTerm)
 
 	// Prepare RequestVote arguments
 	lastLogIndex := uint64(len(n.log) - 1)
@@ -216,6 +221,7 @@ func (n *RaftNode) startElection() {
 			var reply RequestVoteReply
 			if err := p.client.RequestVote(args, &reply); err != nil {
 				n.logger.Printf("Error requesting vote from %s: %v", p.id, err)
+				n.logger.Printf("⚠️  Node %s vote request to %s failed: %v", n.id, p.id, err)
 				return
 			}
 
@@ -237,12 +243,17 @@ func (n *RaftNode) startElection() {
 			if reply.VoteGranted {
 				votesMu.Lock()
 				votesReceived++
+				participants++
 				votesMu.Unlock()
 
 				// Check if we have majority
 				if votesReceived > (len(n.peers)+1)/2 {
 					n.becomeLeader()
 				}
+
+				n.logger.Printf("✅  Node %s got vote from %s (%d/%d)",
+					n.id, p.id, votesReceived, participants)
+
 			}
 		}(peer)
 	}
@@ -285,7 +296,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 
 	var reply AppendEntriesReply
 	if err := peer.client.AppendEntries(args, &reply); err != nil {
-		n.logger.Printf("Error sending AppendEntries to %s: %v", peer.id, err)
+		//n.logger.Printf("Error sending AppendEntries to %s: %v", peer.id, err)
 		return
 	}
 

@@ -294,7 +294,7 @@ func (s *RaftOrderService) ListByMerchant(ctx context.Context, mid uint) ([]*dom
 func (s *RaftOrderService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
 	// For status changes that affect inventory (like cancellations), use Raft
 	// Otherwise, go directly to the underlying service
-	if st == domain.OrderStatusCancelled {
+	if st == domain.OrderStatusCancelled || st == domain.OrderStatusCompleted {
 		cmd := raft.OrderCommand{
 			Type:    "update_order_status",
 			OrderID: id,
@@ -360,6 +360,23 @@ func (s *RaftOrderService) cleanupResults() {
 
 // DeleteOrder deletes an order with Raft consensus
 func (s *RaftOrderService) DeleteOrder(ctx context.Context, id uint) error {
+	// Get the order first to check its status
+	order, _, err := s.orderService.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// If order is pending, we need to cancel it first (which will use Raft)
+	if order.Status == domain.OrderStatusPending {
+		fmt.Printf("DEBUG: Order is pending, need to cancel\n")
+
+		if err := s.UpdateStatus(ctx, id, domain.OrderStatusCancelled); err != nil {
+			return fmt.Errorf("failed to cancel order before deletion: %w", err)
+		}
+		
+	}
+
 	// No need to delete order with Raft, just use the underlying service
 	return s.orderService.DeleteOrder(ctx, id)
+
 }

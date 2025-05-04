@@ -59,8 +59,30 @@ func main() {
 		nodeID = "1" // Default node ID if not specified
 	}
 
-	// In a real system, this would be dynamically discovered or configured
-	peerIDs := []string{"1", "2", "3"}
+	var peerIDs []string
+
+	if ids := os.Getenv("RAFT_PEER_IDS"); ids != "" {
+		for _, id := range strings.Split(ids, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				peerIDs = append(peerIDs, id)
+			}
+		}
+	}
+
+	if len(peerIDs) == 0 {
+		if env := os.Getenv("RAFT_PEERS"); env != "" {
+			for _, kv := range strings.Split(env, ",") {
+				if p := strings.SplitN(kv, "=", 2); len(p) == 2 {
+					peerIDs = append(peerIDs, strings.TrimSpace(p[0]))
+				}
+			}
+		}
+	}
+
+	if len(peerIDs) == 0 {
+		peerIDs = []string{nodeID}
+	}
 
 	peerMap := map[string]string{}
 	if env := os.Getenv("RAFT_PEERS"); env != "" {
@@ -122,53 +144,6 @@ func main() {
 
 	// Initialize and start Raft BEFORE starting the HTTP server
 	// Configure Raft
-	nodeID := os.Getenv("NODE_ID")
-	if nodeID == "" {
-		nodeID = "1" // Default node ID if not specified
-	}
-
-	var peerIDs []string
-
-	if ids := os.Getenv("RAFT_PEER_IDS"); ids != "" {
-		for _, id := range strings.Split(ids, ",") {
-			id = strings.TrimSpace(id)
-			if id != "" {
-				peerIDs = append(peerIDs, id)
-			}
-		}
-	}
-
-	if len(peerIDs) == 0 {
-		if env := os.Getenv("RAFT_PEERS"); env != "" {
-			for _, kv := range strings.Split(env, ",") {
-				if p := strings.SplitN(kv, "=", 2); len(p) == 2 {
-					peerIDs = append(peerIDs, strings.TrimSpace(p[0]))
-				}
-			}
-		}
-	}
-
-	if len(peerIDs) == 0 {
-		peerIDs = []string{nodeID}
-	}
-
-	peerMap := map[string]string{}
-	if env := os.Getenv("RAFT_PEERS"); env != "" {
-		for _, kv := range strings.Split(env, ",") {
-			p := strings.SplitN(kv, "=", 2)
-			if len(p) == 2 {
-				peerMap[p[0]] = p[1]
-			}
-		}
-	}
-
-	// Create Raft-enabled order service
-	raftOrderService, err := service.NewRaftOrderService(
-		orderService,
-		nodeID,
-		peerIDs,
-		peerMap,
-	)
 
 	raftNode := raftOrderService.GetRaftNode()
 	raftNodePtr = raftNode
@@ -253,7 +228,6 @@ func main() {
 		})
 	})
 
-	raftNode := raftOrderService.GetRaftNode()
 	rpcSrv := raft.SetupRaftRPCServer(raftNode)
 	go func() {
 		if err := rpcSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

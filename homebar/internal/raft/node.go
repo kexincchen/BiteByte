@@ -296,7 +296,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 
 	var reply AppendEntriesReply
 	if err := peer.client.AppendEntries(args, &reply); err != nil {
-		//n.logger.Printf("Error sending AppendEntries to %s: %v", peer.id, err)
+		fmt.Printf("Error sending AppendEntries to %s: %v", peer.id, err)
 		return
 	}
 
@@ -315,6 +315,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 	}
 
 	if reply.Success {
+		// fmt.Printf("AppendEntries to %s successful\n", peer.id)
 		// Update nextIndex and matchIndex for successful append
 		n.matchIndex[peer.id] = prevLogIndex + uint64(len(entries))
 		n.nextIndex[peer.id] = n.matchIndex[peer.id] + 1
@@ -322,6 +323,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 		// Check if we can commit more entries
 		n.updateCommitIndex()
 	} else {
+		fmt.Printf("AppendEntries to %s failed\n", peer.id)
 		// If append failed, decrement nextIndex and retry
 		if reply.ConflictTerm > 0 {
 			// Fast backtracking using conflict information
@@ -412,6 +414,7 @@ func (n *RaftNode) Submit(command interface{}) (uint64, error) {
 	}
 
 	n.log = append(n.log, entry)
+	n.logger.Printf("🔄 Node %s submitted command at index %d", n.id, index)
 
 	// Send the new entry to all peers immediately
 	go n.sendHeartbeats()

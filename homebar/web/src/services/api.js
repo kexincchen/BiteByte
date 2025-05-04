@@ -1,9 +1,12 @@
 import axios from "axios";
 
 const HOSTS = (
-    process.env.REACT_APP_SERVER_URLS ||
-    'http://localhost:9001,http://localhost:9002,http://localhost:9003'
-).split(',').map(h => h.trim()).filter(Boolean);
+  process.env.REACT_APP_SERVER_URLS ||
+  "http://localhost:9001,http://localhost:9002,http://localhost:9003"
+)
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean);
 
 let currIdx = 0;
 
@@ -11,50 +14,54 @@ function setBase(i) {
   currIdx = (i + HOSTS.length) % HOSTS.length;
   apiClient.defaults.baseURL = `${HOSTS[currIdx]}/api`;
 }
-function rotateBase() { setBase(currIdx + 1); }
-function getBaseURL() { return apiClient.defaults.baseURL; }
+function rotateBase() {
+  setBase(currIdx + 1);
+}
+function getBaseURL() {
+  return apiClient.defaults.baseURL;
+}
 
 const apiClient = axios.create();
 setBase(0);
 
 apiClient.interceptors.request.use(
-    config => {
-      const token = localStorage.getItem('token');
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-      return config;
-    },
-    error => Promise.reject(error)
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  },
+  (error) => Promise.reject(error)
 );
 
 apiClient.interceptors.response.use(
-    res => res,
-    async err => {
-      if (!err.response) {
-        const tried = currIdx;
-        rotateBase();
-        if (currIdx !== tried) {
-          err.config.baseURL = getBaseURL();
-          return apiClient(err.config);
-        }
+  (res) => res,
+  async (err) => {
+    if (!err.response) {
+      const tried = currIdx;
+      rotateBase();
+      if (currIdx !== tried) {
+        err.config.baseURL = getBaseURL();
+        return apiClient(err.config);
       }
-
-      if (err.response && err.response.status === 307) {
-        const loc = err.response.headers.location || '';
-        try {
-          const origin = new URL(loc).origin;
-          const idx = HOSTS.indexOf(origin);
-          if (idx !== -1) {
-            setBase(idx);
-          } else {
-            apiClient.defaults.baseURL = origin + '/api';
-          }
-          err.config.baseURL = getBaseURL();
-          return apiClient(err.config);
-        } catch {  }
-      }
-
-      return Promise.reject(err);
     }
+
+    if (err.response && err.response.status === 307) {
+      const loc = err.response.headers.location || "";
+      try {
+        const origin = new URL(loc).origin;
+        const idx = HOSTS.indexOf(origin);
+        if (idx !== -1) {
+          setBase(idx);
+        } else {
+          apiClient.defaults.baseURL = origin + "/api";
+        }
+        err.config.baseURL = getBaseURL();
+        return apiClient(err.config);
+      } catch {}
+    }
+
+    return Promise.reject(err);
+  }
 );
 
 // Auth API
@@ -121,6 +128,9 @@ export const orderAPI = {
   },
   getOrdersByCustomer: (customerId) => {
     return apiClient.get(`/orders?customer=${customerId}`);
+  },
+  deleteOrder: (id) => {
+    return apiClient.delete(`/orders/${id}`);
   },
 };
 

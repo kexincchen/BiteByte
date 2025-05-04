@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"errors"
+	"fmt"
 
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/repository"
@@ -34,6 +35,9 @@ func (s *OrderService) CreateOrder(
 	items []SimpleItem,
 	notes string,
 ) (*domain.Order, error) {
+	fmt.Printf("DEBUG: Creating order with customerID=%d, merchantID=%d\n", customerID, merchantID)
+	fmt.Printf("DEBUG: Items: %v\n", items)
+
 	var (
 		total  float64
 		models []domain.OrderItem
@@ -42,6 +46,7 @@ func (s *OrderService) CreateOrder(
 		price := it.Price
 		if price == 0 {
 			p, err := s.productRepo.GetByID(ctx, it.ProductID)
+			fmt.Printf("DEBUG: Product: %v\n", p)
 			if err != nil {
 				return nil, err
 			}
@@ -73,7 +78,9 @@ func (s *OrderService) CreateOrder(
 	}
 
 	// Check if we have enough inventory for this order
+	fmt.Printf("DEBUG: Checking inventory for %d items\n", len(modelPtrs))
 	hasInventory, err := s.ingredientService.HasSufficientInventoryForOrder(ctx, modelPtrs)
+	fmt.Printf("DEBUG: Has inventory: %v\n", hasInventory)
 	if err != nil {
 		return nil, err
 	}
@@ -82,13 +89,15 @@ func (s *OrderService) CreateOrder(
 		return nil, errors.New("insufficient ingredients inventory for this order")
 	}
 
+	fmt.Printf("DEBUG: Creating order in database\n")
 	if err := s.orderRepo.Create(ctx, order, models); err != nil {
+		fmt.Printf("DEBUG: Error creating order in database: %v\n", err)
 		return nil, err
 	}
 
 	// The inventory is already updated by the HasSufficientInventoryForOrder method
 	// which locks and reduces the inventory when successful
-
+	fmt.Printf("DEBUG: Order created in database\n")
 	return order, nil
 }
 
@@ -238,4 +247,37 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, 
 
 func (s *OrderService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
 	return s.ingredientService.CheckProductsAvailability(ctx, productIDs)
+}
+
+// DeleteOrder deletes an order by ID
+func (s *OrderService) DeleteOrder(ctx context.Context, id uint) error {
+	// First get the order to check its status
+	order, _, err := s.orderRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Only completed or cancelled orders can be deleted directly
+	if order.Status == domain.OrderStatusPending {
+		// Cancel the order
+		err = s.UpdateStatus(ctx, id, domain.OrderStatusCancelled)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Start transaction
+	tx, err := s.orderRepo.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete the order
+	if err := s.orderRepo.Delete(ctx, tx, id); err != nil {
+		return err
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }

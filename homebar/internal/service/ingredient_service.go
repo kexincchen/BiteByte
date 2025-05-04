@@ -142,13 +142,14 @@ func (s *IngredientService) HasSufficientInventoryForOrderWithRaft(
 		return hasInventory, err
 	}
 
-	// If we do, create a Raft command to reserve the inventory
-	var orderItemsData []map[string]interface{}
-	for _, item := range orderItems {
-		orderItemsData = append(orderItemsData, map[string]interface{}{
-			"product_id": item.ProductID,
-			"quantity":   item.Quantity,
-		})
+	// Convert orderItemsData to []raft.OrderItemCommand
+	orderItemsData := make([]raft.OrderItemCommand, len(orderItems))
+	for i, item := range orderItems {
+		orderItemsData[i] = raft.OrderItemCommand{
+			ProductID: uint(item.ProductID),
+			Quantity:  int(item.Quantity),
+			Price:     float64(item.Price),
+		}
 	}
 
 	cmd := raft.OrderCommand{

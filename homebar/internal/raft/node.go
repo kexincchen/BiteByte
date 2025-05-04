@@ -41,7 +41,8 @@ type RaftNode struct {
 	applyCommand func(cmd interface{}) error
 
 	// For logging and debugging
-	logger *log.Logger
+	logger   *log.Logger
+	leaderID string
 }
 
 // NewRaftNode creates a new Raft node with the given configuration
@@ -170,6 +171,7 @@ func (n *RaftNode) becomeCandidate() {
 // becomeLeader transitions this node to leader state
 func (n *RaftNode) becomeLeader() {
 	n.state = Leader
+	n.leaderID = n.id
 
 	n.logger.Printf("👑 Node %s becomes LEADER for term %d", n.id, n.currentTerm)
 
@@ -478,6 +480,7 @@ func (n *RaftNode) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesRep
 	// If we get a heartbeat from a leader with equal or higher term
 	if args.Term >= n.currentTerm {
 		n.becomeFollower(args.Term)
+		n.leaderID = args.LeaderID
 
 		// Reset election timer on valid heartbeat
 		timeout := MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout)))
@@ -539,6 +542,24 @@ func (n *RaftNode) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesRep
 	}
 
 	return nil
+}
+
+// IsLeader reports whether this node is the current leader.
+func (n *RaftNode) IsLeader() bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.state == Leader
+}
+
+// LeaderID returns current known leader id (may be empty).
+func (n *RaftNode) LeaderID() string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.leaderID
+}
+
+func (n *RaftNode) ID() string {
+	return n.id
 }
 
 // Helper functions for min/max that work with uint64

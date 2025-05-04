@@ -31,3 +31,5 @@ homebar/web/node_modules
 # IDE 
 homebar/.idea
 homebar/web/.idea
+
+homebar/backend/raft-data

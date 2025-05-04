@@ -163,6 +163,12 @@ func (s *RaftOrderService) applyCommand(cmdInterface interface{}) (*domain.Order
 		return nil, fmt.Errorf("failed to unmarshal command: %w", err)
 	}
 
+	if s.nodeID != s.raftNode.LeaderID() {
+		s.logger.Printf("[Follower-%s] skip %s (already done by leader %s)",
+			s.nodeID, cmd.Type, s.raftNode.LeaderID())
+		return nil, nil
+	}
+
 	fmt.Printf("DEBUG: cmd: %v\n", cmd)
 
 	ctx := context.Background()
@@ -373,7 +379,7 @@ func (s *RaftOrderService) DeleteOrder(ctx context.Context, id uint) error {
 		if err := s.UpdateStatus(ctx, id, domain.OrderStatusCancelled); err != nil {
 			return fmt.Errorf("failed to cancel order before deletion: %w", err)
 		}
-		
+
 	}
 
 	// No need to delete order with Raft, just use the underlying service

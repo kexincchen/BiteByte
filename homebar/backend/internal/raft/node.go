@@ -64,6 +64,35 @@ func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh
 		logger:            logger,
 	}
 
+	// Initialize storage
+	storageDir := os.Getenv("RAFT_STORAGE_DIR")
+	storage, err := NewFileStorage(id, storageDir)
+	if err != nil {
+		logger.Printf("Failed to initialize storage: %v", err)
+		// Continue with in-memory only as fallback
+	} else {
+		node.storage = storage
+
+		// Load persistent state
+		term, votedFor, lastApplied, err := storage.LoadState()
+		if err != nil {
+			logger.Printf("Failed to load state: %v", err)
+		} else {
+			node.currentTerm = term
+			node.votedFor = votedFor
+			node.lastApplied = lastApplied
+			node.commitIndex = max(node.commitIndex, lastApplied)
+		}
+
+		// Load log
+		log, err := storage.LoadLog()
+		if err != nil {
+			logger.Printf("Failed to load log: %v", err)
+		} else if len(log) > 0 {
+			node.log = log
+		}
+	}
+
 	// Initialize peer connections
 	for _, peerID := range peers {
 		if peerID != id { // Don't add self as peer
@@ -383,17 +412,31 @@ func (n *RaftNode) applyCommittedEntries() {
 	defer n.mu.Unlock()
 
 	for n.lastApplied < n.commitIndex {
-		n.lastApplied++
+		// Record previous value to check for changes
+		prevLastApplied := n.lastApplied
 
-		// Apply the command to the state machine
-		entry := n.log[n.lastApplied]
-		n.applyCh <- entry
+        for n.lastApplied < n.commitIndex {
+            n.lastApplied++
+            entry := n.log[n.lastApplied]
+            n.applyCh <- entry
+        }
+        
+        // If lastApplied changed, persist state
+        if prevLastApplied != n.lastApplied {
+            n.persistState()
+        }
+		
+		// n.lastApplied++
 
-		if n.applyCommand != nil {
-			if err := n.applyCommand(entry.Command); err != nil {
-				n.logger.Printf("Error applying command: %v", err)
-			}
-		}
+		// // Apply the command to the state machine
+		// entry := n.log[n.lastApplied]
+		// n.applyCh <- entry
+
+		// if n.applyCommand != nil {
+		// 	if err := n.applyCommand(entry.Command); err != nil {
+		// 		n.logger.Printf("Error applying command: %v", err)
+		// 	}
+		// }
 	}
 }
 
@@ -595,4 +638,25 @@ func (n *RaftNode) UpdateLastApplied(index uint64) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.lastApplied = index
+}
+
+// Add method to persist Raft state
+func (n *RaftNode) persistState() {
+    if n.storage != nil {
+        if err := n.storage.SaveState(n.currentTerm, n.votedFor, n.lastApplied); err != nil {
+            n.logger.Printf("Failed to persist state: %v", err)
+        }
+    }
+}
+
+// Add method to persist log entries
+func (n *RaftNode) persistLog(startIndex uint64) {
+	if n.storage == nil || startIndex >= uint64(len(n.log)) {
+		return
+	}
+
+	entries := n.log[startIndex:]
+	if err := n.storage.AppendLog(entries); err != nil {
+		n.logger.Printf("Failed to persist log entries: %v", err)
+	}
 }

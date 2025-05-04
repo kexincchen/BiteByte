@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 )
@@ -43,6 +44,9 @@ type RaftNode struct {
 	// For logging and debugging
 	logger   *log.Logger
 	leaderID string
+
+	// Add storage field
+	storage Storage
 }
 
 // NewRaftNode creates a new Raft node with the given configuration
@@ -62,6 +66,33 @@ func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh
 		applyCommand:      applyCommand,
 		heartbeatInterval: HeartbeatInterval,
 		logger:            logger,
+	}
+
+	// Initialize storage
+	storageDir := os.Getenv("RAFT_STORAGE_DIR")
+	storage, err := NewFileStorage(id, storageDir)
+	if err != nil {
+		logger.Printf("Failed to initialize storage: %v", err)
+		// Continue with in-memory only as fallback
+	} else {
+		node.storage = storage
+
+		// Load persistent state
+		term, votedFor, err := storage.LoadState()
+		if err != nil {
+			logger.Printf("Failed to load state: %v", err)
+		} else {
+			node.currentTerm = term
+			node.votedFor = votedFor
+		}
+
+		// Load log
+		log, err := storage.LoadLog()
+		if err != nil {
+			logger.Printf("Failed to load log: %v", err)
+		} else if len(log) > 0 {
+			node.log = log
+		}
 	}
 
 	// Initialize peer connections
@@ -148,6 +179,9 @@ func (n *RaftNode) becomeFollower(term uint64) {
 	n.currentTerm = term
 	n.votedFor = ""
 
+	// Persist state to storage
+	n.persistState()
+
 	// Reset election timer with random timeout
 	timeout := MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout)))
 	if n.electionTimer == nil {
@@ -162,6 +196,9 @@ func (n *RaftNode) becomeCandidate() {
 	n.state = Candidate
 	n.currentTerm++
 	n.votedFor = n.id
+
+	// Persist state to storage
+	n.persistState()
 
 	// Reset election timer
 	timeout := MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout)))
@@ -298,7 +335,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 
 	var reply AppendEntriesReply
 	if err := peer.client.AppendEntries(args, &reply); err != nil {
-		fmt.Printf("Error sending AppendEntries to %s: %v", peer.id, err)
+		fmt.Printf("Error sending AppendEntries to %s: %v\n", peer.id, err)
 		return
 	}
 
@@ -418,6 +455,9 @@ func (n *RaftNode) Submit(command interface{}) (uint64, error) {
 	n.log = append(n.log, entry)
 	n.logger.Printf("🔄 Node %s submitted command at index %d", n.id, index)
 
+	// Persist log entry
+	n.persistLog(index)
+
 	// Send the new entry to all peers immediately
 	go n.sendHeartbeats()
 
@@ -430,8 +470,10 @@ func (n *RaftNode) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) er
 	defer n.mu.Unlock()
 
 	// Update term if necessary
+	termChanged := false
 	if args.Term > n.currentTerm {
 		n.becomeFollower(args.Term)
+		termChanged = true
 	}
 
 	reply.Term = n.currentTerm
@@ -452,8 +494,14 @@ func (n *RaftNode) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) er
 		if args.LastLogTerm > lastLogTerm ||
 			(args.LastLogTerm == lastLogTerm && args.LastLogIndex >= lastLogIndex) {
 			// Grant vote
+			prevVotedFor := n.votedFor
 			n.votedFor = args.CandidateID
 			reply.VoteGranted = true
+
+			// Persist state if changed
+			if prevVotedFor != n.votedFor || termChanged {
+				n.persistState()
+			}
 
 			// Reset election timer since we voted
 			timeout := MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout)))
@@ -479,8 +527,14 @@ func (n *RaftNode) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesRep
 
 	// If we get a heartbeat from a leader with equal or higher term
 	if args.Term >= n.currentTerm {
+		prevTerm := n.currentTerm
 		n.becomeFollower(args.Term)
 		n.leaderID = args.LeaderID
+
+		// If term changed, persist state
+		if prevTerm != args.Term {
+			n.persistState()
+		}
 
 		// Reset election timer on valid heartbeat
 		timeout := MinElectionTimeout + time.Duration(rand.Int63n(int64(MaxElectionTimeout-MinElectionTimeout)))
@@ -517,6 +571,8 @@ func (n *RaftNode) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesRep
 	// Append any new entries
 	if len(args.Entries) > 0 {
 		nextIdx := args.PrevLogIndex + 1
+		logChanged := false
+		persistIndex := uint64(len(n.log))
 
 		// Handle new entries
 		for i, entry := range args.Entries {
@@ -526,13 +582,22 @@ func (n *RaftNode) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesRep
 					// Terms don't match, truncate log and append new entries
 					n.log = n.log[:nextIdx+uint64(i)]
 					n.log = append(n.log, args.Entries[i:]...)
+					persistIndex = nextIdx + uint64(i)
+					logChanged = true
 					break
 				}
 			} else {
 				// Reached end of existing log, append remaining entries
 				n.log = append(n.log, args.Entries[i:]...)
+				persistIndex = nextIdx + uint64(i)
+				logChanged = true
 				break
 			}
+		}
+
+		// Persist log if changed
+		if logChanged && n.storage != nil {
+			n.persistLog(persistIndex)
 		}
 	}
 
@@ -595,4 +660,25 @@ func (n *RaftNode) UpdateLastApplied(index uint64) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.lastApplied = index
+}
+
+// Add method to persist Raft state
+func (n *RaftNode) persistState() {
+	if n.storage != nil {
+		if err := n.storage.SaveState(n.currentTerm, n.votedFor); err != nil {
+			n.logger.Printf("Failed to persist state: %v", err)
+		}
+	}
+}
+
+// Add method to persist log entries
+func (n *RaftNode) persistLog(startIndex uint64) {
+	if n.storage == nil || startIndex >= uint64(len(n.log)) {
+		return
+	}
+
+	entries := n.log[startIndex:]
+	if err := n.storage.AppendLog(entries); err != nil {
+		n.logger.Printf("Failed to persist log entries: %v", err)
+	}
 }

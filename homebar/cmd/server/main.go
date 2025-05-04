@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -25,6 +26,11 @@ import (
 	"github.com/kexincchen/homebar/internal/repository/postgres"
 	"github.com/kexincchen/homebar/internal/service"
 	//"time"
+)
+
+var (
+	raftNodePtr *raft.RaftNode
+	appNodeID   string
 )
 
 func main() {
@@ -85,9 +91,61 @@ func main() {
 		ingredientService,
 	)
 
-	// Setup router
-	router = gin.Default()
+	// Initialize and start Raft BEFORE starting the HTTP server
+	// Configure Raft
+	nodeID := os.Getenv("NODE_ID")
+	if nodeID == "" {
+		nodeID = "1" // Default node ID if not specified
+	}
 
+	var peerIDs []string
+
+	if ids := os.Getenv("RAFT_PEER_IDS"); ids != "" {
+		for _, id := range strings.Split(ids, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				peerIDs = append(peerIDs, id)
+			}
+		}
+	}
+
+	if len(peerIDs) == 0 {
+		if env := os.Getenv("RAFT_PEERS"); env != "" {
+			for _, kv := range strings.Split(env, ",") {
+				if p := strings.SplitN(kv, "=", 2); len(p) == 2 {
+					peerIDs = append(peerIDs, strings.TrimSpace(p[0]))
+				}
+			}
+		}
+	}
+
+	if len(peerIDs) == 0 {
+		peerIDs = []string{nodeID}
+	}
+
+	peerMap := map[string]string{}
+	if env := os.Getenv("RAFT_PEERS"); env != "" {
+		for _, kv := range strings.Split(env, ",") {
+			p := strings.SplitN(kv, "=", 2)
+			if len(p) == 2 {
+				peerMap[p[0]] = p[1]
+			}
+		}
+	}
+
+	// Create Raft-enabled order service
+	raftOrderService, err := service.NewRaftOrderService(
+		orderService,
+		nodeID,
+		peerIDs,
+		peerMap,
+	)
+
+	raftNode := raftOrderService.GetRaftNode()
+	raftNodePtr = raftNode
+	appNodeID = nodeID
+
+	router.Use(redirectIfFollower(raftNode))
 	// Enable CORS middleware
 	router.Use(corsMiddleware())
 
@@ -165,35 +223,6 @@ func main() {
 		})
 	})
 
-	// Initialize and start Raft BEFORE starting the HTTP server
-	// Configure Raft
-	nodeID := os.Getenv("NODE_ID")
-	if nodeID == "" {
-		nodeID = "1" // Default node ID if not specified
-	}
-
-	// In a real system, this would be dynamically discovered or configured
-	peerIDs := []string{"1", "2", "3"}
-
-	peerMap := map[string]string{}
-	if env := os.Getenv("RAFT_PEERS"); env != "" {
-		for _, kv := range strings.Split(env, ",") {
-			p := strings.SplitN(kv, "=", 2)
-			if len(p) == 2 {
-				peerMap[p[0]] = p[1]
-			}
-		}
-	}
-
-	// Create Raft-enabled order service
-	raftOrderService, err := service.NewRaftOrderService(
-		orderService,
-		nodeID,
-		peerIDs,
-		peerMap,
-	)
-
-	raftNode := raftOrderService.GetRaftNode()
 	rpcSrv := raft.SetupRaftRPCServer(raftNode)
 	go func() {
 		if err := rpcSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -260,6 +289,44 @@ func main() {
 	cancel()
 }
 
+// redirectIfFollower returns gin middleware that forwards non-leader nodes.
+func redirectIfFollower(node *raft.RaftNode) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/health") ||
+			strings.HasPrefix(c.Request.URL.Path, "/raft") {
+			c.Next()
+			return
+		}
+
+		if node.IsLeader() {
+			log.Printf("[LEADER %s] handle %s %s",
+				node.ID(), c.Request.Method, c.Request.URL.Path)
+			c.Next()
+			return
+		}
+
+		leader := node.LeaderID()
+		if leader == "" {
+			log.Printf("[FOLLOWER %s] leader unknown -> 503  (%s %s)",
+				node.ID(), c.Request.Method, c.Request.URL.Path)
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable,
+				gin.H{"error": "leader unknown"})
+			return
+		}
+
+		target := fmt.Sprintf("http://localhost:90%s%s", leader, c.Request.URL.Path)
+		if q := c.Request.URL.RawQuery; q != "" {
+			target += "?" + q
+		}
+
+		log.Printf("[FORWARD %s] %s %s  --> leader %s  (%s)",
+			node.ID(), c.Request.Method, c.Request.URL.Path, leader, target)
+
+		c.Header("Location", target)
+		c.AbortWithStatus(http.StatusTemporaryRedirect)
+	}
+}
+
 // CORS middleware to allow frontend to access the API
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -279,6 +346,10 @@ func corsMiddleware() gin.HandlerFunc {
 // Logger middleware
 func loggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		role := "FOLLOWER"
+		if raftNodePtr != nil && raftNodePtr.IsLeader() {
+			role = "LEADER"
+		}
 		// Log request details
 		startTime := time.Now()
 		requestID := uuid.New().String()
@@ -293,9 +364,9 @@ func loggerMiddleware() gin.HandlerFunc {
 			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
 		}
 
-		log.Printf("[%s] API Request: %s %s\nHeaders: %v\nBody: %s",
-			requestID, c.Request.Method, c.Request.URL.Path,
-			c.Request.Header, string(requestBody))
+		log.Printf("[%s][%s-%s] --> %s %s  body=%s",
+			requestID, role, appNodeID,
+			c.Request.Method, c.Request.URL.String(), string(requestBody))
 
 		// Use ResponseWriter wrapper to capture response
 		blw := &bodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
@@ -306,9 +377,10 @@ func loggerMiddleware() gin.HandlerFunc {
 
 		// Log response
 		latency := time.Since(startTime)
-		log.Printf("[%s] API Response: %d %s (%s)\nBody: %s",
-			requestID, c.Writer.Status(), http.StatusText(c.Writer.Status()),
-			latency, blw.body.String())
+		log.Printf("[%s][%s-%s] <-- %d %s  (%s)",
+			requestID, role, appNodeID,
+			c.Writer.Status(), http.StatusText(c.Writer.Status()),
+			latency)
 	}
 }
 

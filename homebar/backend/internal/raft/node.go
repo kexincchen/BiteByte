@@ -425,12 +425,6 @@ func (n *RaftNode) applyCommittedEntries() {
 		// Apply the command to the state machine
 		entry := n.log[n.lastApplied]
 		n.applyCh <- entry
-
-		if n.applyCommand != nil {
-			if err := n.applyCommand(entry.Command); err != nil {
-				n.logger.Printf("Error applying command: %v", err)
-			}
-		}
 	}
 }
 

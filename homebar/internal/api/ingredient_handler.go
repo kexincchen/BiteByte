@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,17 +9,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kexincchen/homebar/internal/domain"
-	"github.com/kexincchen/homebar/internal/service"
 )
 
+// Update the IngredientHandler struct to support both regular and Raft-enabled services
 type IngredientHandler struct {
-	ingredientService *service.IngredientService
+	service IngredientServiceInterface
 }
 
-func NewIngredientHandler(ingredientService *service.IngredientService) *IngredientHandler {
-	return &IngredientHandler{
-		ingredientService: ingredientService,
-	}
+// Define an interface that both IngredientService and RaftIngredientService implement
+type IngredientServiceInterface interface {
+	CreateIngredient(ctx context.Context, ingredient *domain.Ingredient) (*domain.Ingredient, error)
+	GetIngredientByID(ctx context.Context, id int64) (*domain.Ingredient, error)
+	GetIngredientsByMerchant(ctx context.Context, merchantID int64) ([]*domain.Ingredient, error)
+	UpdateIngredient(ctx context.Context, ingredient *domain.Ingredient) error
+	DeleteIngredient(ctx context.Context, id int64) error
+	GetInventorySummary(ctx context.Context, merchantID int64) (map[string]interface{}, error)
+	CheckProductAvailability(ctx context.Context, productID uint) (bool, error)
+	CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error)
+}
+
+// NewIngredientHandler creates a new handler with either service type
+func NewIngredientHandler(service IngredientServiceInterface) *IngredientHandler {
+	return &IngredientHandler{service: service}
 }
 
 // Create handles ingredient creation
@@ -50,7 +62,7 @@ func (h *IngredientHandler) Create(c *gin.Context) {
 	ingredient.CreatedAt = now
 	ingredient.UpdatedAt = now
 
-	createdIngredient, err := h.ingredientService.CreateIngredient(c.Request.Context(), &ingredient)
+	createdIngredient, err := h.service.CreateIngredient(c.Request.Context(), &ingredient)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating ingredient"})
 		return
@@ -81,7 +93,7 @@ func (h *IngredientHandler) GetByID(c *gin.Context) {
 	// 	return
 	// }
 
-	ingredient, err := h.ingredientService.GetIngredientByID(c.Request.Context(), ingredientID)
+	ingredient, err := h.service.GetIngredientByID(c.Request.Context(), ingredientID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving ingredient"})
 		return
@@ -124,7 +136,7 @@ func (h *IngredientHandler) Update(c *gin.Context) {
 	// }
 
 	// Get the existing ingredient
-	existingIngredient, err := h.ingredientService.GetIngredientByID(c.Request.Context(), ingredientID)
+	existingIngredient, err := h.service.GetIngredientByID(c.Request.Context(), ingredientID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving ingredient"})
 		return
@@ -155,7 +167,7 @@ func (h *IngredientHandler) Update(c *gin.Context) {
 	existingIngredient.LowStockThreshold = updateData.LowStockThreshold
 	existingIngredient.UpdatedAt = time.Now()
 
-	if err := h.ingredientService.UpdateIngredient(c.Request.Context(), existingIngredient); err != nil {
+	if err := h.service.UpdateIngredient(c.Request.Context(), existingIngredient); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating ingredient"})
 		return
 	}
@@ -187,7 +199,7 @@ func (h *IngredientHandler) Delete(c *gin.Context) {
 	// }
 
 	// Get the existing ingredient to verify ownership
-	existingIngredient, err := h.ingredientService.GetIngredientByID(c.Request.Context(), ingredientID)
+	existingIngredient, err := h.service.GetIngredientByID(c.Request.Context(), ingredientID)
 	fmt.Println("Existing ingredient: ", existingIngredient)
 	if err != nil {
 		fmt.Println("Error retrieving ingredient: ", err)
@@ -207,7 +219,7 @@ func (h *IngredientHandler) Delete(c *gin.Context) {
 	}
 
 	// Delete the ingredient
-	if err := h.ingredientService.DeleteIngredient(c.Request.Context(), ingredientID); err != nil {
+	if err := h.service.DeleteIngredient(c.Request.Context(), ingredientID); err != nil {
 		fmt.Println("Error deleting ingredient: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deleting ingredient"})
 		return
@@ -232,7 +244,7 @@ func (h *IngredientHandler) GetAll(c *gin.Context) {
 	// 	return
 	// }
 
-	ingredients, err := h.ingredientService.GetIngredientsByMerchant(c.Request.Context(), merchantID)
+	ingredients, err := h.service.GetIngredientsByMerchant(c.Request.Context(), merchantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving ingredients"})
 		return
@@ -256,7 +268,7 @@ func (h *IngredientHandler) GetInventorySummary(c *gin.Context) {
 	// 	return
 	// }
 
-	summary, err := h.ingredientService.GetInventorySummary(c.Request.Context(), merchantID)
+	summary, err := h.service.GetInventorySummary(c.Request.Context(), merchantID)
 	if err != nil {
 		fmt.Println("Error retrieving inventory summary: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving inventory summary"})
@@ -269,25 +281,25 @@ func (h *IngredientHandler) GetInventorySummary(c *gin.Context) {
 }
 
 // Helper method to authorize merchant access
-func (h *IngredientHandler) authorizeMerchant(c *gin.Context, merchantID int64) bool {
-	// Get the merchant from context
-	merchantRaw, exists := c.Get("merchant")
-	if !exists {
-		fmt.Println("Merchant not found in context")
-		return false
-	}
+// func (h *IngredientHandler) authorizeMerchant(c *gin.Context, merchantID int64) bool {
+// 	// Get the merchant from context
+// 	merchantRaw, exists := c.Get("merchant")
+// 	if !exists {
+// 		fmt.Println("Merchant not found in context")
+// 		return false
+// 	}
 
-	merchant, ok := merchantRaw.(*domain.Merchant)
-	if !ok || merchant == nil {
-		fmt.Println("Merchant is not a domain.Merchant")
-		return false
-	}
+// 	merchant, ok := merchantRaw.(*domain.Merchant)
+// 	if !ok || merchant == nil {
+// 		fmt.Println("Merchant is not a domain.Merchant")
+// 		return false
+// 	}
 
-	// Check if user is a merchant and matches the merchant ID
-	if merchant.ID != uint(merchantID) {
-		fmt.Println("Merchant does not match merchant ID")
-		return false
-	}
+// 	// Check if user is a merchant and matches the merchant ID
+// 	if merchant.ID != uint(merchantID) {
+// 		fmt.Println("Merchant does not match merchant ID")
+// 		return false
+// 	}
 
-	return true
-}
+// 	return true
+// }

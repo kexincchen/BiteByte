@@ -52,6 +52,26 @@ func main() {
 		}
 	}(dbConn)
 
+	// Initialize and start Raft BEFORE starting the HTTP server
+	// Configure Raft
+	nodeID := os.Getenv("NODE_ID")
+	if nodeID == "" {
+		nodeID = "1" // Default node ID if not specified
+	}
+
+	// In a real system, this would be dynamically discovered or configured
+	peerIDs := []string{"1", "2", "3"}
+
+	peerMap := map[string]string{}
+	if env := os.Getenv("RAFT_PEERS"); env != "" {
+		for _, kv := range strings.Split(env, ",") {
+			p := strings.SplitN(kv, "=", 2)
+			if len(p) == 2 {
+				peerMap[p[0]] = p[1]
+			}
+		}
+	}
+
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(dbConn)
 	customerRepo := repository.NewCustomerRepository(dbConn)
@@ -77,12 +97,19 @@ func main() {
 		ingredientService,
 		inventoryRepo,
 	)
+	// Create Raft-enabled order service
+	raftOrderService, err := service.NewRaftOrderService(
+		orderService,
+		nodeID,
+		peerIDs,
+		peerMap,
+	)
 	merchantService := service.NewMerchantService(merchantRepo)
 
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
 	productHandler := api.NewProductHandler(productService, ingredientService)
-	orderHandler := api.NewOrderHandler(orderService, productService)
+	// orderHandler := api.NewOrderHandler(orderService, productService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
 	ingredientHandler := api.NewIngredientHandler(ingredientService)
 	productIngredientHandler := api.NewProductIngredientHandler(
@@ -90,6 +117,8 @@ func main() {
 		productService,
 		ingredientService,
 	)
+	// Use raftOrderService instead of orderService when initializing handlers
+	orderHandler := api.NewOrderHandler(raftOrderService, productService)
 
 	// Initialize and start Raft BEFORE starting the HTTP server
 	// Configure Raft
@@ -183,6 +212,7 @@ func main() {
 			orderRoutes.GET("/:id", orderHandler.GetByID)
 			orderRoutes.PUT("/:id/status", orderHandler.UpdateStatus)
 			orderRoutes.PUT("/:id", orderHandler.UpdateOrder)
+			orderRoutes.DELETE("/:id", orderHandler.Delete)
 		}
 
 		// Merchant routes
@@ -223,6 +253,7 @@ func main() {
 		})
 	})
 
+	raftNode := raftOrderService.GetRaftNode()
 	rpcSrv := raft.SetupRaftRPCServer(raftNode)
 	go func() {
 		if err := rpcSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -240,9 +271,6 @@ func main() {
 	if err := raftOrderService.Start(ctx); err != nil {
 		log.Fatalf("Failed to start Raft node: %v", err)
 	}
-
-	// Use raftOrderService instead of orderService when initializing handlers
-	orderHandler = api.NewOrderHandler(raftOrderService, productService)
 
 	// Create and start the cluster coordinator
 	raftLogger := log.New(os.Stdout, "[RAFT-COORDINATOR] ", log.LstdFlags)

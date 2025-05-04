@@ -15,10 +15,10 @@ import (
 
 type ProductHandler struct {
 	productService    *service.ProductService
-	ingredientService *service.IngredientService
+	ingredientService IngredientServiceInterface
 }
 
-func NewProductHandler(ps *service.ProductService, is *service.IngredientService) *ProductHandler {
+func NewProductHandler(ps *service.ProductService, is IngredientServiceInterface) *ProductHandler {
 	return &ProductHandler{productService: ps, ingredientService: is}
 }
 

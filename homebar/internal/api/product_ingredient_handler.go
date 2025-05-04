@@ -13,13 +13,13 @@ import (
 type ProductIngredientHandler struct {
 	productIngredientService *service.ProductIngredientService
 	productService           *service.ProductService
-	ingredientService        *service.IngredientService
+	ingredientService        IngredientServiceInterface
 }
 
 func NewProductIngredientHandler(
 	productIngredientService *service.ProductIngredientService,
 	productService *service.ProductService,
-	ingredientService *service.IngredientService,
+	ingredientService IngredientServiceInterface,
 ) *ProductIngredientHandler {
 	return &ProductIngredientHandler{
 		productIngredientService: productIngredientService,

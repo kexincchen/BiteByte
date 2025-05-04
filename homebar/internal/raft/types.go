@@ -45,9 +45,15 @@ type OrderCommand struct {
 	OrderID        uint                   // ID of the order (if applicable)
 	CustomerID     uint                   // Customer ID
 	MerchantID     uint                   // Merchant ID
-	OrderItems     interface{}            // Items in the order
-	Inventory      map[uint]float64       // Inventory changes
+	OrderItems     []OrderItemCommand     // Items in the order
 	AdditionalData map[string]interface{} // Additional command-specific data
+}
+
+// OrderItemCommand represents an item in an order command
+type OrderItemCommand struct {
+    ProductID uint    `json:"product_id"`
+    Quantity  int     `json:"quantity"`
+    Price     float64 `json:"price"`
 }
 
 // RequestVoteArgs represents the arguments for a RequestVote RPC

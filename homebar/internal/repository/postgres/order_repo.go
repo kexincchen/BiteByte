@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/kexincchen/homebar/internal/domain"
 )
@@ -73,7 +74,7 @@ func (r *OrderRepo) GetByID(ctx context.Context, id uint) (*domain.Order, []doma
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
 		if err != nil {
-
+			log.Printf("Error closing rows: %v", err)
 		}
 	}(rows)
 	var list []domain.OrderItem
@@ -105,7 +106,7 @@ func (r *OrderRepo) list(ctx context.Context, where string, arg interface{}) ([]
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
 		if err != nil {
-
+			log.Printf("Error closing rows: %v", err)
 		}
 	}(rows)
 	var list []*domain.Order
@@ -152,8 +153,20 @@ func (r *OrderRepo) Update(ctx context.Context, tx *sql.Tx, order *domain.Order)
 	return err
 }
 
-// GetDB returns the database connection
+// Delete removes an order and its items from the database
+func (r *OrderRepo) Delete(ctx context.Context, tx *sql.Tx, id uint) error {
+	// Delete order items first due to foreign key constraints
+	_, err := tx.ExecContext(ctx, `DELETE FROM order_items WHERE order_id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	// Then delete the order
+	_, err = tx.ExecContext(ctx, `DELETE FROM orders WHERE id = $1`, id)
+	return err
+}
+
+// GetDB returns the underlying database connection
 func (r *OrderRepo) GetDB() *sql.DB {
 	return r.db
 }
-

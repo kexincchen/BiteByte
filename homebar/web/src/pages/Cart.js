@@ -30,6 +30,7 @@ const Cart = () => {
         items: cartItems.map((item) => ({
           product_id: parseInt(item.id), // Ensure it's a number
           quantity: item.quantity,
+          price: item.price,
         })),
         notes: "",
       };

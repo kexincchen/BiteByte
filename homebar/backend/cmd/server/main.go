@@ -119,33 +119,38 @@ func main() {
 		ingredientService,
 		inventoryRepo,
 	)
-	// Create Raft-enabled order service
-	raftOrderService, err := service.NewRaftOrderService(
+	merchantService := service.NewMerchantService(merchantRepo)
+	// Create Raft-enabled service
+	raftService, err := service.NewRaftService(
 		orderService,
+		ingredientService,
 		nodeID,
 		peerIDs,
 		peerMap,
 	)
-	merchantService := service.NewMerchantService(merchantRepo)
+	if err != nil {
+		log.Fatalf("Failed to create Raft service: %v", err)
+	}
 
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
 	productHandler := api.NewProductHandler(productService, ingredientService)
 	// orderHandler := api.NewOrderHandler(orderService, productService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
-	ingredientHandler := api.NewIngredientHandler(ingredientService)
+	// ingredientHandler := api.NewIngredientHandler(ingredientService)
 	productIngredientHandler := api.NewProductIngredientHandler(
 		productIngredientService,
 		productService,
 		ingredientService,
 	)
-	// Use raftOrderService instead of orderService when initializing handlers
-	orderHandler := api.NewOrderHandler(raftOrderService, productService)
+	// Use raftService instead of orderService when initializing handlers
+	orderHandler := api.NewOrderHandler(raftService, productService)
+	ingredientHandler := api.NewIngredientHandler(raftService)
 
 	// Initialize and start Raft BEFORE starting the HTTP server
 	// Configure Raft
 
-	raftNode := raftOrderService.GetRaftNode()
+	raftNode := raftService.GetRaftNode()
 	raftNodePtr = raftNode
 	appNodeID = nodeID
 
@@ -242,7 +247,7 @@ func main() {
 	// Start the Raft node
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := raftOrderService.Start(ctx); err != nil {
+	if err := raftService.Start(ctx); err != nil {
 		log.Fatalf("Failed to start Raft node: %v", err)
 	}
 
@@ -251,7 +256,7 @@ func main() {
 	clusterCoordinator := raft.NewClusterCoordinator(raftLogger)
 
 	// Register the node with the coordinator
-	clusterCoordinator.RegisterNode(raftOrderService.GetRaftNode())
+	clusterCoordinator.RegisterNode(raftService.GetRaftNode())
 
 	// Start the coordinator
 	if err := clusterCoordinator.Start(ctx, nodeID); err != nil {

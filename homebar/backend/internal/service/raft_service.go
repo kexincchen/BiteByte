@@ -108,16 +108,13 @@ func (s *RaftService) CreateOrder(
 			"notes": notes,
 		},
 	}
-	fmt.Printf("DEBUG: Submitting order to Raft: %v\n", cmd)
 	// Submit the command to Raft
 	index, err := s.raftNode.Submit(cmd)
-	fmt.Printf("DEBUG: Submitted order to Raft: index=%d, err=%v\n", index, err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit order to Raft: %w", err)
 	}
 
 	// Wait for the command to be applied
-	fmt.Printf("DEBUG: Waiting for order to be applied\n")
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -125,7 +122,6 @@ func (s *RaftService) CreateOrder(
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Printf("DEBUG: Ticker ticked\n")
 			// Check if the command has been applied
 			s.updateLastApplied(index)
 
@@ -136,17 +132,14 @@ func (s *RaftService) CreateOrder(
 				// Delete the result from the cache to avoid memory leaks
 				delete(s.orderResultMap, index)
 				s.resultMapLock.Unlock()
-				fmt.Printf("DEBUG: Retrieved order from result cache: %v\n", order)
 				return order, nil
 			}
 			s.resultMapLock.Unlock()
 
 		case <-timeout:
-			fmt.Printf("DEBUG: Timeout waiting for order creation\n")
 			return nil, errors.New("timeout waiting for order creation")
 
 		case <-ctx.Done():
-			fmt.Printf("DEBUG: Context done\n")
 			return nil, ctx.Err()
 		}
 	}
@@ -159,7 +152,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 
 	// Convert the interface to an OrderCommand
 	cmdBytes, err := json.Marshal(cmdInterface)
-	fmt.Printf("DEBUG: cmdBytes: %v\n", string(cmdBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal command: %w", err)
 	}
@@ -175,7 +167,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 		return nil, nil, nil
 	}
 
-	fmt.Printf("DEBUG: cmd: %v\n", cmd)
 
 	ctx := context.Background()
 
@@ -210,12 +201,7 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 		}
 
 		// Call the underlying service to create the order
-		fmt.Printf("DEBUG: cmd.CustomerID: %v\n", cmd.CustomerID)
-		fmt.Printf("DEBUG: cmd.MerchantID: %v\n", cmd.MerchantID)
-		fmt.Printf("DEBUG: items: %v\n", items)
-		fmt.Printf("DEBUG: notes: %v\n", notes)
 		order, err := s.orderService.CreateOrder(ctx, cmd.CustomerID, cmd.MerchantID, items, notes)
-		fmt.Printf("DEBUG: Order created: %v\n", order)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create order: %w", err)
 		}
@@ -223,7 +209,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 		// Store the order ID in the command for reference
 		cmd.OrderID = order.ID
 		createdOrder = order
-		fmt.Printf("DEBUG: cmd.OrderID: %v\n", cmd.OrderID)
 
 	case "update_order_status":
 		// Get the status from additional data
@@ -441,7 +426,6 @@ func (s *RaftService) DeleteOrder(ctx context.Context, id uint) error {
 
 	// If order is pending, we need to cancel it first (which will use Raft)
 	if order.Status == domain.OrderStatusPending {
-		fmt.Printf("DEBUG: Order is pending, need to cancel\n")
 
 		if err := s.UpdateStatus(ctx, id, domain.OrderStatusCancelled); err != nil {
 			return fmt.Errorf("failed to cancel order before deletion: %w", err)

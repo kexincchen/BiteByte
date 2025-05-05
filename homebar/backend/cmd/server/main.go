@@ -272,7 +272,6 @@ func main() {
 	// Create a zerolog logger for the Raft coordinator
 	raftCoordLogger := log.With().Str("component", "RAFT-COORDINATOR").Logger()
 
-
 	// Create and start the cluster coordinator with the adapted logger
 	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger, peerMap)
 
@@ -431,6 +430,12 @@ func (w bodyLogWriter) Write(b []byte) (int, error) {
 
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		if strings.HasPrefix(c.Request.URL.Path, "/health") {
+			c.Next()
+			return
+		}
+
 		start := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
@@ -451,7 +456,7 @@ func RequestLogger() gin.HandlerFunc {
 			Str("ip", clientIP).
 			Int("status", statusCode).
 			Dur("latency", latency).
-			Logger() // Convert Context to Logger		
+			Logger() // Convert Context to Logger
 
 		switch {
 		case statusCode >= 500:

@@ -272,8 +272,6 @@ func main() {
 	// Create a zerolog logger for the Raft coordinator
 	raftCoordLogger := log.With().Str("component", "RAFT-COORDINATOR").Logger()
 
-	// Create a standard logger adapter from zerolog for the cluster coordinator
-	// stdLogger := logging.NewStdLogAdapter(raftCoordLogger, "RAFT-COORDINATOR")
 
 	// Create and start the cluster coordinator with the adapted logger
 	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger)

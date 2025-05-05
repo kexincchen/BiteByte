@@ -5,6 +5,10 @@ import (
 	"fmt"
 	// "log"
 	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,10 +42,12 @@ type ClusterCoordinator struct {
 	httpServer *http.Server
 	logger     *zerolog.Logger
 	stopCh     chan struct{}
+	peerAddrs  map[string]string
+	selfID     string
 }
 
 // NewClusterCoordinator creates a new coordinator for managing the cluster
-func NewClusterCoordinator(logger *zerolog.Logger) *ClusterCoordinator {
+func NewClusterCoordinator(logger *zerolog.Logger, peerAddrs map[string]string) *ClusterCoordinator {
 	return &ClusterCoordinator{
 		nodes: make(map[string]*RaftNode),
 		state: ClusterState{
@@ -51,8 +57,9 @@ func NewClusterCoordinator(logger *zerolog.Logger) *ClusterCoordinator {
 			Nodes:       make(map[string]NodeStatus),
 			LastUpdated: time.Now(),
 		},
-		logger: logger,
-		stopCh: make(chan struct{}),
+		logger:    logger,
+		stopCh:    make(chan struct{}),
+		peerAddrs: peerAddrs,
 	}
 }
 
@@ -61,18 +68,46 @@ func (c *ClusterCoordinator) RegisterNode(node *RaftNode) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
+	selfAddr := "http://127.0.0.1" + port
+
 	c.nodes[node.id] = node
 	c.state.Nodes[node.id] = NodeStatus{
 		ID:        node.id,
 		State:     Follower, // Assume follower initially
 		IsHealthy: true,
 		LastSeen:  time.Now(),
-		Address:   fmt.Sprintf("localhost:808%s", node.id), // Simplified address for demo
+		Address:   selfAddr,
+	}
+
+	for id, raftAddr := range c.peerAddrs {
+		if id == node.id {
+			continue
+		}
+		if _, ok := c.state.Nodes[id]; ok {
+			continue
+		}
+
+		businessAddr := raftToBusinessAddr(raftAddr)
+		c.state.Nodes[id] = NodeStatus{
+			ID:        id,
+			State:     Follower,
+			IsHealthy: false,
+			LastSeen:  time.Time{},
+			Address:   businessAddr,
+		}
 	}
 }
 
 // Start begins the coordinator's monitoring and management tasks
 func (c *ClusterCoordinator) Start(ctx context.Context, nodeID string) error {
+	c.selfID = nodeID
 	// Start HTTP server for admin API
 	c.startHTTPServer(nodeID)
 
@@ -174,6 +209,28 @@ func (c *ClusterCoordinator) checkNodesHealth() {
 		c.state.Nodes[node.id] = status
 		c.mu.Unlock()
 	}
+
+	c.mu.RLock()
+	peers := make(map[string]NodeStatus, len(c.state.Nodes))
+	for id, st := range c.state.Nodes {
+		peers[id] = st
+	}
+	c.mu.RUnlock()
+
+	for id, st := range peers {
+		if id == c.selfID {
+			continue
+		}
+		url := strings.TrimRight(st.Address, "/") + "/health"
+
+		ok := probe(url)
+		c.mu.Lock()
+		cur := c.state.Nodes[id]
+		cur.IsHealthy = ok
+		cur.LastSeen = time.Now()
+		c.state.Nodes[id] = cur
+		c.mu.Unlock()
+	}
 }
 
 // updateClusterState collects and updates the overall cluster state
@@ -182,18 +239,22 @@ func (c *ClusterCoordinator) updateClusterState() {
 	defer c.mu.Unlock()
 
 	// Find the leader and its term
+	var maxTerm uint64
 	for _, node := range c.nodes {
 		node.mu.Lock()
 
 		if node.state == Leader {
 			c.state.LeaderID = node.id
-			c.state.Term = node.currentTerm
+			maxTerm = node.currentTerm
 			c.state.CommitIndex = node.commitIndex
+		} else if node.currentTerm > maxTerm {
+			maxTerm = node.currentTerm
 		}
 
 		node.mu.Unlock()
 	}
 
+	c.state.Term = maxTerm
 	c.state.LastUpdated = time.Now()
 }
 
@@ -203,13 +264,17 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 
 	// Add endpoints for cluster management
 	mux.HandleFunc("/cluster/status", func(w http.ResponseWriter, r *http.Request) {
-		// Return cluster status as JSON
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
 		state := c.GetClusterState()
+
+		alive := 0
+		for _, ns := range state.Nodes {
+			if ns.IsHealthy {
+				alive++
+			}
+		}
 		fmt.Fprintf(w, `{"leader":"%s","term":%d,"nodes":%d}`,
-			state.LeaderID, state.Term, len(state.Nodes))
+			state.LeaderID, state.Term, alive)
 	})
 
 	mux.HandleFunc("/cluster/nodes", func(w http.ResponseWriter, r *http.Request) {
@@ -235,4 +300,22 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 			c.logger.Error().Err(err).Msg("HTTP server error")
 		}
 	}()
+}
+
+func probe(url string) bool {
+	cli := &http.Client{Timeout: 300 * time.Millisecond}
+	resp, err := cli.Get(url)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+func raftToBusinessAddr(raftAddr string) string {
+	u, _ := url.Parse(strings.TrimSuffix(raftAddr, "/raft"))
+	host, portStr, _ := strings.Cut(u.Host, ":")
+	port, _ := strconv.Atoi(portStr)
+	businessPort := port + 920
+	return fmt.Sprintf("http://%s:%d", host, businessPort)
 }

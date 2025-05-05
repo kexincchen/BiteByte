@@ -274,7 +274,7 @@ func main() {
 
 
 	// Create and start the cluster coordinator with the adapted logger
-	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger)
+	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger, peerMap)
 
 	// Register the node with the coordinator
 	clusterCoordinator.RegisterNode(raftService.GetRaftNode())
@@ -374,6 +374,12 @@ func corsMiddleware() gin.HandlerFunc {
 // Logger middleware
 func loggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		if strings.HasPrefix(c.Request.URL.Path, "/health") {
+			c.Next()
+			return
+		}
+
 		role := "FOLLOWER"
 		if raftNodePtr != nil && raftNodePtr.IsLeader() {
 			role = "LEADER"

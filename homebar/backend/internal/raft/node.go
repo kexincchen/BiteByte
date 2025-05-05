@@ -144,8 +144,8 @@ func (n *RaftNode) Start(ctx context.Context) error {
 		peer.client = client
 	}
 
-	// Initialize as follower
-	n.becomeFollower(0)
+	// Become follower at the term we have just loaded
+	n.becomeFollower(n.currentTerm)
 
 	// Start the main loop
 	go n.run(ctx)
@@ -194,10 +194,16 @@ func (n *RaftNode) run(ctx context.Context) {
 
 // becomeFollower transitions this node to follower state
 func (n *RaftNode) becomeFollower(term uint64) {
-	n.state = Follower
-	n.currentTerm = term
-	n.votedFor = ""
+	oldTerm := n.currentTerm
+	if term > n.currentTerm {
+		n.currentTerm = term
+	}
 
+	n.state = Follower
+
+	if term > oldTerm {
+		n.votedFor = ""
+	}
 	// Persist state to storage
 	n.persistState()
 

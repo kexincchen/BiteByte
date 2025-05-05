@@ -1,3 +1,5 @@
+# Database Setup
+
 ## 1. Start PostgreSQL via Docker Compose
 
 ```bash

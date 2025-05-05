@@ -6,7 +6,8 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
-	"log"
+
+	// "log"
 	"net/http"
 	"os"
 	"strings"
@@ -17,10 +18,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/kexincchen/homebar/internal/api"
 	"github.com/kexincchen/homebar/internal/config"
 	"github.com/kexincchen/homebar/internal/db"
+	// "github.com/kexincchen/homebar/internal/logging"
 	"github.com/kexincchen/homebar/internal/raft"
 	"github.com/kexincchen/homebar/internal/repository"
 	"github.com/kexincchen/homebar/internal/repository/postgres"
@@ -43,12 +47,12 @@ func main() {
 	cfg := config.Load()
 	dbConn, err := db.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("db init error: %v", err)
+		log.Fatal().Err(err).Msg("db init error")
 	}
 	defer func(dbConn *sql.DB) {
 		err := dbConn.Close()
 		if err != nil {
-			log.Fatalf("db close error: %v", err)
+			log.Fatal().Err(err).Msg("db close error")
 		}
 	}(dbConn)
 
@@ -129,7 +133,7 @@ func main() {
 		peerMap,
 	)
 	if err != nil {
-		log.Fatalf("Failed to create Raft service: %v", err)
+		log.Fatal().Err(err).Msg("Failed to create Raft service")
 	}
 
 	// Initialize handlers
@@ -160,6 +164,7 @@ func main() {
 
 	// Add logger middleware
 	router.Use(loggerMiddleware())
+	router.Use(RequestLogger())
 
 	// Define routes
 	apiRoutes := router.Group("/api")
@@ -236,31 +241,49 @@ func main() {
 	rpcSrv := raft.SetupRaftRPCServer(raftNode)
 	go func() {
 		if err := rpcSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Raft RPC listen error: %v", err)
+			log.Fatal().Err(err).Msg("Raft RPC listen error")
 		}
 	}()
 
 	if err != nil {
-		log.Fatalf("Failed to create Raft order service: %v", err)
+		log.Fatal().Err(err).Msg("Failed to create Raft order service")
 	}
 
 	// Start the Raft node
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := raftService.Start(ctx); err != nil {
-		log.Fatalf("Failed to start Raft node: %v", err)
+		log.Fatal().Err(err).Msg("Failed to start Raft node")
 	}
 
-	// Create and start the cluster coordinator
-	raftLogger := log.New(os.Stdout, "[RAFT-COORDINATOR] ", log.LstdFlags)
-	clusterCoordinator := raft.NewClusterCoordinator(raftLogger)
+	// Set up zerolog
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: "2006-01-02 15:04:05",
+		NoColor:    false,
+		PartsOrder: []string{
+			zerolog.TimestampFieldName,
+			zerolog.LevelFieldName,
+			zerolog.MessageFieldName,
+		},
+	})
+
+	// Create a zerolog logger for the Raft coordinator
+	raftCoordLogger := log.With().Str("component", "RAFT-COORDINATOR").Logger()
+
+	// Create a standard logger adapter from zerolog for the cluster coordinator
+	// stdLogger := logging.NewStdLogAdapter(raftCoordLogger, "RAFT-COORDINATOR")
+
+	// Create and start the cluster coordinator with the adapted logger
+	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger)
 
 	// Register the node with the coordinator
 	clusterCoordinator.RegisterNode(raftService.GetRaftNode())
 
 	// Start the coordinator
 	if err := clusterCoordinator.Start(ctx, nodeID); err != nil {
-		log.Fatalf("Failed to start cluster coordinator: %v", err)
+		log.Fatal().Err(err).Msg("Failed to start cluster coordinator")
 	}
 	defer clusterCoordinator.Stop()
 
@@ -281,14 +304,14 @@ func main() {
 	go func() {
 		log.Printf("Serving on %s", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			log.Fatal().Err(err).Msg("HTTP server error")
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down...")
+	log.Info().Msg("Shutting down...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -400,4 +423,91 @@ type bodyLogWriter struct {
 func (w bodyLogWriter) Write(b []byte) (int, error) {
 	w.body.Write(b)
 	return w.ResponseWriter.Write(b)
+}
+
+func RequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+
+		// Process request
+		c.Next()
+
+		// After request
+		latency := time.Since(start)
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		statusCode := c.Writer.Status()
+
+		logEvent := log.With().
+			Str("method", method).
+			Str("path", path).
+			Str("query", query).
+			Str("ip", clientIP).
+			Int("status", statusCode).
+			Dur("latency", latency).
+			Logger() // Convert Context to Logger		
+
+		switch {
+		case statusCode >= 500:
+			logEvent.Error().Msg("Server error")
+		case statusCode >= 400:
+			logEvent.Warn().Msg("Client error")
+		default:
+			logEvent.Info().Msg("Request")
+		}
+	}
+}
+
+func RequestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+			c.Header("X-Request-ID", requestID)
+		}
+
+		// Set it in the context
+		c.Set("requestID", requestID)
+
+		// Add it to the logger context
+		logger := log.With().Str("request_id", requestID).Logger()
+		c.Set("logger", logger)
+
+		c.Next()
+	}
+}
+
+func configureLogging() {
+	// Default to info level
+	logLevelStr := os.Getenv("LOG_LEVEL")
+	if logLevelStr == "" {
+		logLevelStr = "info"
+	}
+
+	var level zerolog.Level
+	switch strings.ToLower(logLevelStr) {
+	case "debug":
+		level = zerolog.DebugLevel
+	case "info":
+		level = zerolog.InfoLevel
+	case "warn", "warning":
+		level = zerolog.WarnLevel
+	case "error":
+		level = zerolog.ErrorLevel
+	default:
+		level = zerolog.InfoLevel
+	}
+
+	zerolog.SetGlobalLevel(level)
+
+	// Use pretty logging for development
+	if os.Getenv("ENVIRONMENT") != "production" {
+		log.Logger = log.Output(zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339,
+			NoColor:    false,
+		})
+	}
 }

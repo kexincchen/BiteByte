@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	// "log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+    "github.com/rs/zerolog/log"
 
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/raft"
@@ -22,7 +25,7 @@ type RaftService struct {
 	applyCh             chan raft.LogEntry
 	nodeID              string
 	isLeader            bool
-	logger              *log.Logger
+	// logger              *log.Logger
 	orderResultMap      map[uint64]*domain.Order
 	ingredientResultMap map[uint64]*domain.Ingredient
 	resultMapLock       sync.Mutex
@@ -36,7 +39,16 @@ func NewRaftService(
 	peerIDs []string,
 	peerAddrs map[string]string,
 ) (*RaftService, error) {
-	logger := log.New(os.Stdout, fmt.Sprintf("[RAFT-%s] ", nodeID), log.LstdFlags)
+	// logger := log.New(os.Stdout, fmt.Sprintf("[RAFT-%s] ", nodeID), log.LstdFlags)
+	raftLogger := log.With().
+        Str("component", "raft").
+        Str("node_id", nodeID).
+        Logger()
+    
+    // Use raftLogger.Info(), raftLogger.Error(), etc.
+    
+    raftLogger.Info().Msg("Initializing Raft service")
+    
 
 	applyCh := make(chan raft.LogEntry, raft.MaxLogEntriesBuffer)
 
@@ -46,7 +58,7 @@ func NewRaftService(
 		applyCh:             applyCh,
 		nodeID:              nodeID,
 		isLeader:            false,
-		logger:              logger,
+		// logger:              logger,
 		orderResultMap:      make(map[uint64]*domain.Order),
 		ingredientResultMap: make(map[uint64]*domain.Ingredient),
 	}
@@ -61,7 +73,6 @@ func NewRaftService(
 			_, _, err := service.applyCommand(cmd)
 			return err
 		},
-		logger,
 	)
 
 	service.raftNode = raftNode
@@ -122,6 +133,13 @@ func (s *RaftService) CreateOrder(
 	for {
 		select {
 		case <-ticker.C:
+			// Log performance metrics
+			log.Info().
+			Uint("customer_id", customerID).
+			Uint("merchant_id", merchantID).
+			Int("item_count", len(items)).
+			Msg("Order created successfully")
+
 			// Check if the command has been applied
 			s.updateLastApplied(index)
 
@@ -162,11 +180,10 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 	}
 
 	if s.nodeID != s.raftNode.LeaderID() {
-		s.logger.Printf("[Follower-%s] skip %s (already done by leader %s)",
+		log.Printf("[Follower-%s] skip %s (already done by leader %s)",
 			s.nodeID, cmd.Type, s.raftNode.LeaderID())
 		return nil, nil, nil
 	}
-
 
 	ctx := context.Background()
 
@@ -305,12 +322,12 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 func (s *RaftService) processAppliedCommands() {
 	for entry := range s.applyCh {
 		// Log that we received a command for auditing
-		s.logger.Printf("Applied command at index %d, term %d", entry.Index, entry.Term)
+		log.Printf("Applied command at index %d, term %d", entry.Index, entry.Term)
 
 		// Apply the command directly and store the result
 		order, ingredient, err := s.applyCommand(entry.Command)
 		if err != nil {
-			s.logger.Printf("Error applying command: %v", err)
+			log.Printf("Error applying command: %v", err)
 			continue
 		}
 
@@ -558,4 +575,20 @@ func (s *RaftService) UpdateIngredient(ctx context.Context, ingredient *domain.I
 
 	// For updates, we don't need to wait for a result
 	return nil
+}
+
+func init() {
+    // Pretty console logging for development
+    log.Logger = log.Output(zerolog.ConsoleWriter{
+        Out:        os.Stdout,
+        TimeFormat: time.RFC3339,
+        NoColor:    false,
+    })
+    
+    // Set global log level
+    zerolog.SetGlobalLevel(zerolog.InfoLevel)
+    
+    // Enable caller information
+    zerolog.CallerSkipFrameCount = 3
+    log.Logger = log.With().Logger()
 }

@@ -176,48 +176,11 @@ func (r *IngredientRepository) GetInventorySummary(ctx context.Context, merchant
 		return nil, err
 	}
 
-	fmt.Println("Total ingredients: ", totalIngredients)
-	fmt.Println("Low stock count: ", lowStockCount)
-
 	return map[string]interface{}{
 		"totalIngredients": totalIngredients,
 		"lowStockCount":    lowStockCount,
 	}, nil
 }
-
-// func (r *IngredientRepository) GetInventorySummary(ctx context.Context, merchantID int64) (map[string]interface{}, error) {
-// 	summary := make(map[string]interface{})
-	
-// 	// Get total count of ingredients
-// 	var totalCount int
-// 	err := r.db.QueryRowContext(
-// 		ctx,
-// 		"SELECT COUNT(*) FROM ingredients WHERE merchant_id = $1",
-// 		merchantID,
-// 	).Scan(&totalCount)
-	
-// 	if err != nil {
-// 		return nil, err
-// 	}
-	
-// 	summary["totalIngredients"] = totalCount
-	
-// 	// Get count of low stock items
-// 	var lowStockCount int
-// 	err = r.db.QueryRowContext(
-// 		ctx,
-// 		"SELECT COUNT(*) FROM ingredients WHERE merchant_id = $1 AND quantity <= low_stock_threshold",
-// 		merchantID,
-// 	).Scan(&lowStockCount)
-	
-// 	if err != nil {
-// 		return nil, err
-// 	}
-	
-// 	summary["lowStockCount"] = lowStockCount
-	
-// 	return summary, nil
-// }
 
 // CheckProductsAvailability checks if multiple products have sufficient ingredients
 func (r *IngredientRepository) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {

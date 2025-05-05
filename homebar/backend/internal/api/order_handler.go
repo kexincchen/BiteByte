@@ -95,10 +95,8 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 // List GET /api/orders?customer=1  or  ?merchant=2
 func (h *OrderHandler) List(c *gin.Context) {
 	if cidStr := c.Query("customer"); cidStr != "" {
-		fmt.Println("cidStr: ", cidStr)
 		cid, _ := strconv.Atoi(cidStr)
 		list, _ := h.orderService.ListByCustomer(c, uint(cid))
-		fmt.Println("list: ", list)
 		c.JSON(http.StatusOK, list)
 		return
 	}

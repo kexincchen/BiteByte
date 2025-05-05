@@ -364,7 +364,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 		// Check if we can commit more entries
 		n.updateCommitIndex()
 	} else {
-		fmt.Printf("AppendEntries to %s failed\n", peer.id)
+		// fmt.Printf("AppendEntries to %s failed\n", peer.id)
 		// If append failed, decrement nextIndex and retry
 		if reply.ConflictTerm > 0 {
 			// Fast backtracking using conflict information

@@ -274,7 +274,7 @@ func main() {
 
 
 	// Create and start the cluster coordinator with the adapted logger
-	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger, , peerMap)
+	clusterCoordinator := raft.NewClusterCoordinator(&raftCoordLogger, peerMap)
 
 	// Register the node with the coordinator
 	clusterCoordinator.RegisterNode(raftService.GetRaftNode())

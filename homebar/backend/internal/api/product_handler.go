@@ -236,7 +236,5 @@ func (h *ProductHandler) CheckAvailability(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("Availability: ", availability)
-
 	c.JSON(http.StatusOK, gin.H{"availability": availability})
 }

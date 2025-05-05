@@ -3,7 +3,7 @@ package raft
 import (
 	"context"
 	"fmt"
-	"log"
+	// "log"
 	"net/http"
 	"net/url"
 	"os"
@@ -11,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+	// "github.com/rs/zerolog/log"
 )
 
 // ClusterState represents the overall state of the Raft cluster
@@ -37,14 +40,14 @@ type ClusterCoordinator struct {
 	nodes      map[string]*RaftNode
 	state      ClusterState
 	httpServer *http.Server
-	logger     *log.Logger
+	logger     *zerolog.Logger
 	stopCh     chan struct{}
 	peerAddrs  map[string]string
 	selfID     string
 }
 
 // NewClusterCoordinator creates a new coordinator for managing the cluster
-func NewClusterCoordinator(logger *log.Logger, peerAddrs map[string]string) *ClusterCoordinator {
+func NewClusterCoordinator(logger *zerolog.Logger, peerAddrs map[string]string) *ClusterCoordinator {
 	return &ClusterCoordinator{
 		nodes: make(map[string]*RaftNode),
 		state: ClusterState{
@@ -294,7 +297,7 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 
 	go func() {
 		if err := c.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			c.logger.Printf("HTTP server error: %v", err)
+			c.logger.Error().Err(err).Msg("HTTP server error")
 		}
 	}()
 }

@@ -286,7 +286,6 @@ func (r *InventoryRepository) CheckProductsAvailability(ctx context.Context, pro
 		}
 		availability[id] = available
 	}
-	fmt.Println("Availability: ", availability)
 
 	return availability, nil
 }

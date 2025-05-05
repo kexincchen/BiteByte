@@ -3,11 +3,15 @@ package raft
 import (
 	"context"
 	"fmt"
-	"log"
+	"strings"
+	// "log"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // RaftNode represents a node in the Raft cluster
@@ -42,7 +46,7 @@ type RaftNode struct {
 	applyCommand func(cmd interface{}) error
 
 	// For logging and debugging
-	logger   *log.Logger
+	logger   *zerolog.Logger
 	leaderID string
 
 	// Add storage field
@@ -50,7 +54,13 @@ type RaftNode struct {
 }
 
 // NewRaftNode creates a new Raft node with the given configuration
-func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh chan LogEntry, applyCommand func(cmd interface{}) error, logger *log.Logger) *RaftNode {
+func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh chan LogEntry, applyCommand func(cmd interface{}) error) *RaftNode {
+	// Create a zerolog instance with Raft-specific formatting
+	logger := log.With().
+		Str("component", "raft").
+		Str("node_id", id).
+		Logger()
+
 	node := &RaftNode{
 		id:                id,
 		peers:             make(map[string]*RaftPeer),
@@ -65,14 +75,21 @@ func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh
 		matchIndex:        make(map[string]uint64),
 		applyCommand:      applyCommand,
 		heartbeatInterval: HeartbeatInterval,
-		logger:            logger,
+		logger:            &logger,
 	}
+
+	// Log node creation
+	logger.Info().
+		Str("state", string(Follower)).
+		Int("peers", len(peers)).
+		Msg("Raft node created")
 
 	// Initialize storage
 	storageDir := os.Getenv("RAFT_STORAGE_DIR")
 	storage, err := NewFileStorage(id, storageDir)
 	if err != nil {
-		logger.Printf("Failed to initialize storage: %v", err)
+		// fmt.Printf("Failed to initialize storage: %v", err)
+		log.Error().Err(err).Msg("Failed to initialize storage")
 		// Continue with in-memory only as fallback
 	} else {
 		node.storage = storage
@@ -112,7 +129,7 @@ func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh
 
 // Start initializes the Raft node and begins operation
 func (n *RaftNode) Start(ctx context.Context) error {
-	n.logger.Printf("Starting Raft node %s", n.id)
+	n.logger.Info().Msgf("Starting Raft node %s", n.id)
 
 	// Initialize peer connections
 	for id, peer := range n.peers {
@@ -151,7 +168,7 @@ func (n *RaftNode) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			n.logger.Printf("Shutting down Raft node %s", n.id)
+			n.logger.Info().Msgf("Shutting down Raft node %s", n.id)
 			return
 
 		case <-n.electionTimer.C:
@@ -218,7 +235,7 @@ func (n *RaftNode) becomeLeader() {
 	n.state = Leader
 	n.leaderID = n.id
 
-	n.logger.Printf("👑 Node %s becomes LEADER for term %d", n.id, n.currentTerm)
+	n.logger.Info().Msgf("👑 Node %s becomes LEADER for term %d", n.id, n.currentTerm)
 
 	// Initialize nextIndex and matchIndex
 	lastLogIndex := uint64(len(n.log) - 1)
@@ -243,7 +260,7 @@ func (n *RaftNode) startElection() {
 	votesReceived := 1
 
 	participants := 1
-	n.logger.Printf("⏳ Node %s starts election for term %d", n.id, n.currentTerm)
+	n.logger.Info().Msgf("⏳ Node %s starts election for term %d", n.id, n.currentTerm)
 
 	// Prepare RequestVote arguments
 	lastLogIndex := uint64(len(n.log) - 1)
@@ -267,8 +284,9 @@ func (n *RaftNode) startElection() {
 
 			var reply RequestVoteReply
 			if err := p.client.RequestVote(args, &reply); err != nil {
-				n.logger.Printf("Error requesting vote from %s: %v", p.id, err)
-				n.logger.Printf("⚠️  Node %s vote request to %s failed: %v", n.id, p.id, err)
+				if !(strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "connection refused")) {
+					n.logger.Info().Msgf("⚠️  Node %s vote request to %s failed: %v", n.id, p.id, err)
+				}
 				return
 			}
 
@@ -298,7 +316,7 @@ func (n *RaftNode) startElection() {
 					n.becomeLeader()
 				}
 
-				n.logger.Printf("✅  Node %s got vote from %s (%d/%d)",
+				n.logger.Info().Msgf("✅  Node %s got vote from %s (%d/%d)",
 					n.id, p.id, votesReceived, participants)
 
 			}
@@ -343,7 +361,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 
 	var reply AppendEntriesReply
 	if err := peer.client.AppendEntries(args, &reply); err != nil {
-		fmt.Printf("Error sending AppendEntries to %s: %v\n", peer.id, err)
+		// fmt.Printf("Error sending AppendEntries to %s: %v\n", peer.id, err)
 		return
 	}
 
@@ -370,7 +388,7 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 		// Check if we can commit more entries
 		n.updateCommitIndex()
 	} else {
-		fmt.Printf("AppendEntries to %s failed\n", peer.id)
+		// fmt.Printf("AppendEntries to %s failed\n", peer.id)
 		// If append failed, decrement nextIndex and retry
 		if reply.ConflictTerm > 0 {
 			// Fast backtracking using conflict information
@@ -450,7 +468,7 @@ func (n *RaftNode) applyCommittedEntries() {
 
 		// if n.applyCommand != nil {
 		// 	if err := n.applyCommand(entry.Command); err != nil {
-		// 		n.logger.Printf("Error applying command: %v", err)
+		// 		n.logger.Info().Msgf("Error applying command: %v", err)
 		// 	}
 		// }
 	}
@@ -475,7 +493,7 @@ func (n *RaftNode) Submit(command interface{}) (uint64, error) {
 	}
 
 	n.log = append(n.log, entry)
-	n.logger.Printf("🔄 Node %s submitted command at index %d", n.id, index)
+	n.logger.Info().Msgf("🔄 Node %s submitted command at index %d", n.id, index)
 
 	// Persist log entry
 	n.persistLog(index)
@@ -688,7 +706,7 @@ func (n *RaftNode) UpdateLastApplied(index uint64) {
 func (n *RaftNode) persistState() {
 	if n.storage != nil {
 		if err := n.storage.SaveState(n.currentTerm, n.votedFor, n.lastApplied); err != nil {
-			n.logger.Printf("Failed to persist state: %v", err)
+			n.logger.Info().Msgf("Failed to persist state: %v", err)
 		}
 	}
 }
@@ -701,6 +719,6 @@ func (n *RaftNode) persistLog(startIndex uint64) {
 
 	entries := n.log[startIndex:]
 	if err := n.storage.AppendLog(entries); err != nil {
-		n.logger.Printf("Failed to persist log entries: %v", err)
+		n.logger.Info().Msgf("Failed to persist log entries: %v", err)
 	}
 }

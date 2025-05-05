@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	// "log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+    "github.com/rs/zerolog/log"
 
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/raft"
@@ -22,7 +25,7 @@ type RaftService struct {
 	applyCh             chan raft.LogEntry
 	nodeID              string
 	isLeader            bool
-	logger              *log.Logger
+	// logger              *log.Logger
 	orderResultMap      map[uint64]*domain.Order
 	ingredientResultMap map[uint64]*domain.Ingredient
 	resultMapLock       sync.Mutex
@@ -36,7 +39,16 @@ func NewRaftService(
 	peerIDs []string,
 	peerAddrs map[string]string,
 ) (*RaftService, error) {
-	logger := log.New(os.Stdout, fmt.Sprintf("[RAFT-%s] ", nodeID), log.LstdFlags)
+	// logger := log.New(os.Stdout, fmt.Sprintf("[RAFT-%s] ", nodeID), log.LstdFlags)
+	raftLogger := log.With().
+        Str("component", "raft").
+        Str("node_id", nodeID).
+        Logger()
+    
+    // Use raftLogger.Info(), raftLogger.Error(), etc.
+    
+    raftLogger.Info().Msg("Initializing Raft service")
+    
 
 	applyCh := make(chan raft.LogEntry, raft.MaxLogEntriesBuffer)
 
@@ -46,7 +58,7 @@ func NewRaftService(
 		applyCh:             applyCh,
 		nodeID:              nodeID,
 		isLeader:            false,
-		logger:              logger,
+		// logger:              logger,
 		orderResultMap:      make(map[uint64]*domain.Order),
 		ingredientResultMap: make(map[uint64]*domain.Ingredient),
 	}
@@ -61,7 +73,6 @@ func NewRaftService(
 			_, _, err := service.applyCommand(cmd)
 			return err
 		},
-		logger,
 	)
 
 	service.raftNode = raftNode
@@ -108,16 +119,13 @@ func (s *RaftService) CreateOrder(
 			"notes": notes,
 		},
 	}
-	fmt.Printf("DEBUG: Submitting order to Raft: %v\n", cmd)
 	// Submit the command to Raft
 	index, err := s.raftNode.Submit(cmd)
-	fmt.Printf("DEBUG: Submitted order to Raft: index=%d, err=%v\n", index, err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit order to Raft: %w", err)
 	}
 
 	// Wait for the command to be applied
-	fmt.Printf("DEBUG: Waiting for order to be applied\n")
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -125,7 +133,13 @@ func (s *RaftService) CreateOrder(
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Printf("DEBUG: Ticker ticked\n")
+			// Log performance metrics
+			log.Info().
+			Uint("customer_id", customerID).
+			Uint("merchant_id", merchantID).
+			Int("item_count", len(items)).
+			Msg("Order created successfully")
+
 			// Check if the command has been applied
 			s.updateLastApplied(index)
 
@@ -136,17 +150,14 @@ func (s *RaftService) CreateOrder(
 				// Delete the result from the cache to avoid memory leaks
 				delete(s.orderResultMap, index)
 				s.resultMapLock.Unlock()
-				fmt.Printf("DEBUG: Retrieved order from result cache: %v\n", order)
 				return order, nil
 			}
 			s.resultMapLock.Unlock()
 
 		case <-timeout:
-			fmt.Printf("DEBUG: Timeout waiting for order creation\n")
 			return nil, errors.New("timeout waiting for order creation")
 
 		case <-ctx.Done():
-			fmt.Printf("DEBUG: Context done\n")
 			return nil, ctx.Err()
 		}
 	}
@@ -159,7 +170,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 
 	// Convert the interface to an OrderCommand
 	cmdBytes, err := json.Marshal(cmdInterface)
-	fmt.Printf("DEBUG: cmdBytes: %v\n", string(cmdBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal command: %w", err)
 	}
@@ -170,12 +180,10 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 	}
 
 	if s.nodeID != s.raftNode.LeaderID() {
-		s.logger.Printf("[Follower-%s] skip %s (already done by leader %s)",
+		log.Printf("[Follower-%s] skip %s (already done by leader %s)",
 			s.nodeID, cmd.Type, s.raftNode.LeaderID())
 		return nil, nil, nil
 	}
-
-	fmt.Printf("DEBUG: cmd: %v\n", cmd)
 
 	ctx := context.Background()
 
@@ -210,12 +218,7 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 		}
 
 		// Call the underlying service to create the order
-		fmt.Printf("DEBUG: cmd.CustomerID: %v\n", cmd.CustomerID)
-		fmt.Printf("DEBUG: cmd.MerchantID: %v\n", cmd.MerchantID)
-		fmt.Printf("DEBUG: items: %v\n", items)
-		fmt.Printf("DEBUG: notes: %v\n", notes)
 		order, err := s.orderService.CreateOrder(ctx, cmd.CustomerID, cmd.MerchantID, items, notes)
-		fmt.Printf("DEBUG: Order created: %v\n", order)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create order: %w", err)
 		}
@@ -223,7 +226,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 		// Store the order ID in the command for reference
 		cmd.OrderID = order.ID
 		createdOrder = order
-		fmt.Printf("DEBUG: cmd.OrderID: %v\n", cmd.OrderID)
 
 	case "update_order_status":
 		// Get the status from additional data
@@ -320,12 +322,12 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 func (s *RaftService) processAppliedCommands() {
 	for entry := range s.applyCh {
 		// Log that we received a command for auditing
-		s.logger.Printf("Applied command at index %d, term %d", entry.Index, entry.Term)
+		log.Printf("Applied command at index %d, term %d", entry.Index, entry.Term)
 
 		// Apply the command directly and store the result
 		order, ingredient, err := s.applyCommand(entry.Command)
 		if err != nil {
-			s.logger.Printf("Error applying command: %v", err)
+			log.Printf("Error applying command: %v", err)
 			continue
 		}
 
@@ -441,7 +443,6 @@ func (s *RaftService) DeleteOrder(ctx context.Context, id uint) error {
 
 	// If order is pending, we need to cancel it first (which will use Raft)
 	if order.Status == domain.OrderStatusPending {
-		fmt.Printf("DEBUG: Order is pending, need to cancel\n")
 
 		if err := s.UpdateStatus(ctx, id, domain.OrderStatusCancelled); err != nil {
 			return fmt.Errorf("failed to cancel order before deletion: %w", err)
@@ -574,4 +575,20 @@ func (s *RaftService) UpdateIngredient(ctx context.Context, ingredient *domain.I
 
 	// For updates, we don't need to wait for a result
 	return nil
+}
+
+func init() {
+    // Pretty console logging for development
+    log.Logger = log.Output(zerolog.ConsoleWriter{
+        Out:        os.Stdout,
+        TimeFormat: time.RFC3339,
+        NoColor:    false,
+    })
+    
+    // Set global log level
+    zerolog.SetGlobalLevel(zerolog.InfoLevel)
+    
+    // Enable caller information
+    zerolog.CallerSkipFrameCount = 3
+    log.Logger = log.With().Logger()
 }

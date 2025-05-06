@@ -88,7 +88,6 @@ func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh
 	storageDir := os.Getenv("RAFT_STORAGE_DIR")
 	storage, err := NewFileStorage(id, storageDir)
 	if err != nil {
-		// fmt.Printf("Failed to initialize storage: %v", err)
 		log.Error().Err(err).Msg("Failed to initialize storage")
 		// Continue with in-memory only as fallback
 	} else {
@@ -361,7 +360,6 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 
 	var reply AppendEntriesReply
 	if err := peer.client.AppendEntries(args, &reply); err != nil {
-		// fmt.Printf("Error sending AppendEntries to %s: %v\n", peer.id, err)
 		return
 	}
 
@@ -380,7 +378,6 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 	}
 
 	if reply.Success {
-		// fmt.Printf("AppendEntries to %s successful\n", peer.id)
 		// Update nextIndex and matchIndex for successful append
 		n.matchIndex[peer.id] = prevLogIndex + uint64(len(entries))
 		n.nextIndex[peer.id] = n.matchIndex[peer.id] + 1
@@ -388,7 +385,6 @@ func (n *RaftNode) sendAppendEntries(peer *RaftPeer) {
 		// Check if we can commit more entries
 		n.updateCommitIndex()
 	} else {
-		// fmt.Printf("AppendEntries to %s failed\n", peer.id)
 		// If append failed, decrement nextIndex and retry
 		if reply.ConflictTerm > 0 {
 			// Fast backtracking using conflict information

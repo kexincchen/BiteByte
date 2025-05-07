@@ -133,4 +133,16 @@ During order processing, the system:
 
 The system provides a health check endpoint at `/health` that returns a 200 OK status when the service is operating correctly.
 
+### Raft Cluster Monitoring
 
+The `scripts/monitor_raft.sh` script provides a real-time view of the Raft cluster status:
+
+- Displays active nodes and their states
+- Shows current leader information
+- Provides recent log entries
+
+To run the monitoring script:
+
+```
+./scripts/monitor_raft.sh
+```

@@ -2,6 +2,7 @@ package raft
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	// "log"
 	"net/http"
@@ -145,23 +146,6 @@ func (c *ClusterCoordinator) GetClusterState() ClusterState {
 	return state
 }
 
-// updateNodeStatus updates the status of a node in the cluster state
-func (c *ClusterCoordinator) updateNodeStatus(nodeID string, status NodeStatus) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.state.Nodes[nodeID] = status
-	c.state.LastUpdated = time.Now()
-
-	// If this node is leader, update leader ID
-	if status.State == Leader {
-		c.state.LeaderID = nodeID
-	} else if c.state.LeaderID == nodeID {
-		// If current leader is no longer leader, clear leader ID
-		c.state.LeaderID = ""
-	}
-}
-
 // runMonitoring periodically checks node health and updates cluster state
 func (c *ClusterCoordinator) runMonitoring(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
@@ -284,6 +268,78 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 
 		state := c.GetClusterState()
 		fmt.Fprintf(w, `{"count":%d}`, len(state.Nodes))
+	})
+
+	mux.HandleFunc("/cluster/logs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		
+		// Get the limit parameter if provided
+		limitStr := r.URL.Query().Get("limit")
+		limit := 10 // Default limit
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				limit = l
+			}
+		}
+		
+		// Get the node ID from the request if provided
+		nodeID := r.URL.Query().Get("node")
+		
+		// Get the log entries
+		var logEntries []LogEntry
+		if nodeID != "" && c.nodes[nodeID] != nil {
+			// Get logs from the specific node
+			node := c.nodes[nodeID]
+			node.mu.Lock()
+			if len(node.log) > 0 {
+				startIdx := len(node.log) - limit
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				logEntries = append(logEntries, node.log[startIdx:]...)
+			}
+			node.mu.Unlock()
+		} else {
+			// Get leader logs as a default
+			for _, node := range c.nodes {
+				node.mu.Lock()
+				if node.state == Leader && len(node.log) > 0 {
+					startIdx := len(node.log) - limit
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					logEntries = append(logEntries, node.log[startIdx:]...)
+					node.mu.Unlock()
+					break
+				}
+				node.mu.Unlock()
+			}
+		}
+		
+		// Create a simplified response
+		type LogEntryResponse struct {
+			Index   uint64 `json:"index"`
+			Term    uint64 `json:"term"`
+			Type    string `json:"type,omitempty"`
+		}
+		
+		response := make([]LogEntryResponse, 0, len(logEntries))
+		for _, entry := range logEntries {
+			// Try to determine command type
+			cmdType := "unknown"
+			if cmd, ok := entry.Command.(OrderCommand); ok {
+				cmdType = cmd.Type
+			}
+			
+			response = append(response, LogEntryResponse{
+				Index: entry.Index,
+				Term:  entry.Term,
+				Type:  cmdType,
+			})
+		}
+		
+		// Return the entries
+		json.NewEncoder(w).Encode(response)
 	})
 
 	// Use a different coordinator port for each node

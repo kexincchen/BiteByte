@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	// "log"
 	"os"
 	"sync"
 	"time"
@@ -25,7 +24,6 @@ type RaftService struct {
 	applyCh             chan raft.LogEntry
 	nodeID              string
 	isLeader            bool
-	// logger              *log.Logger
 	orderResultMap      map[uint64]*domain.Order
 	ingredientResultMap map[uint64]*domain.Ingredient
 	resultMapLock       sync.Mutex
@@ -39,17 +37,15 @@ func NewRaftService(
 	peerIDs []string,
 	peerAddrs map[string]string,
 ) (*RaftService, error) {
-	// logger := log.New(os.Stdout, fmt.Sprintf("[RAFT-%s] ", nodeID), log.LstdFlags)
 	raftLogger := log.With().
         Str("component", "raft").
         Str("node_id", nodeID).
         Logger()
-    
-    // Use raftLogger.Info(), raftLogger.Error(), etc.
-    
-    raftLogger.Info().Msg("Initializing Raft service")
-    
 
+	// Initialize the Raft node
+    raftLogger.Info().Msg("Initializing Raft service")
+
+	// Create the apply channel
 	applyCh := make(chan raft.LogEntry, raft.MaxLogEntriesBuffer)
 
 	service := &RaftService{
@@ -58,7 +54,6 @@ func NewRaftService(
 		applyCh:             applyCh,
 		nodeID:              nodeID,
 		isLeader:            false,
-		// logger:              logger,
 		orderResultMap:      make(map[uint64]*domain.Order),
 		ingredientResultMap: make(map[uint64]*domain.Ingredient),
 	}
@@ -142,8 +137,6 @@ func (s *RaftService) CreateOrder(
 
 			// Check if the command has been applied
 			s.updateLastApplied(index)
-
-			// Check if the command has been applied
 			s.resultMapLock.Lock()
 			order, exists := s.orderResultMap[index]
 			if exists {
@@ -198,17 +191,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 				Price:     item.Price,
 			}
 		}
-		// // Convert order items from interface to SimpleItem
-		// var items []SimpleItem
-		// itemsData, err := json.Marshal(cmd.OrderItems)
-		// fmt.Println("itemsData", string(itemsData))
-		// if err != nil {
-		// 	return fmt.Errorf("failed to marshal order items: %w", err)
-		// }
-
-		// if err := json.Unmarshal(itemsData, &items); err != nil {
-		// 	return fmt.Errorf("failed to unmarshal order items: %w", err)
-		// }
 
 		notes := ""
 		if notesVal, ok := cmd.AdditionalData["notes"]; ok {
@@ -255,10 +237,6 @@ func (s *RaftService) applyCommand(cmdInterface interface{}) (*domain.Order, *do
 		}
 
 		return nil, nil, nil
-
-	case "update_inventory":
-		// Process inventory updates without orders
-		// This would be implemented similarly to create_order
 
 	case "create_ingredient":
 		// Extract ingredient data from command
@@ -347,41 +325,6 @@ func (s *RaftService) processAppliedCommands() {
 	}
 }
 
-// Other methods that the OrderService has, such as GetByID, UpdateStatus, etc.
-// These methods can go directly to the underlying OrderService since they don't
-// affect distributed state
-
-func (s *RaftService) GetByID(ctx context.Context, id uint) (*domain.Order, []domain.OrderItem, error) {
-	return s.orderService.GetByID(ctx, id)
-}
-
-func (s *RaftService) ListByCustomer(ctx context.Context, cid uint) ([]*domain.Order, error) {
-	return s.orderService.ListByCustomer(ctx, cid)
-}
-
-func (s *RaftService) ListByMerchant(ctx context.Context, mid uint) ([]*domain.Order, error) {
-	return s.orderService.ListByMerchant(ctx, mid)
-}
-
-func (s *RaftService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
-	// For status changes that affect inventory (like cancellations), use Raft
-	// Otherwise, go directly to the underlying service
-	if st == domain.OrderStatusCancelled || st == domain.OrderStatusCompleted {
-		cmd := raft.OrderCommand{
-			Type:    "update_order_status",
-			OrderID: id,
-			AdditionalData: map[string]interface{}{
-				"status": string(st),
-			},
-		}
-
-		_, err := s.raftNode.Submit(cmd)
-		return err
-	}
-
-	return s.orderService.UpdateStatus(ctx, id, st)
-}
-
 func (s *RaftService) UpdateOrder(ctx context.Context, id uint, status string, notes string) error {
 	// For status changes that affect inventory, use Raft
 	if status == string(domain.OrderStatusCancelled) {
@@ -401,36 +344,23 @@ func (s *RaftService) UpdateOrder(ctx context.Context, id uint, status string, n
 	return s.orderService.UpdateOrder(ctx, id, status, notes)
 }
 
-func (s *RaftService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
-	return s.orderService.CheckProductsAvailability(ctx, productIDs)
-}
-
-// GetRaftNode returns the underlying Raft node
-func (s *RaftService) GetRaftNode() *raft.RaftNode {
-	return s.raftNode
-}
-
-func (s *RaftService) updateLastApplied(index uint64) {
-	s.raftNode.UpdateLastApplied(index)
-}
-
-// CleanupResults cleans up the result map
-func (s *RaftService) cleanupResults() {
-	ticker := time.NewTicker(1 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		s.resultMapLock.Lock()
-		// Clean up based on time or maximum number
-		// Here we simplify the cleanup, in actual use, it should be more refined
-		if len(s.orderResultMap) > 1000 {
-			s.orderResultMap = make(map[uint64]*domain.Order)
+func (s *RaftService) UpdateStatus(ctx context.Context, id uint, st domain.OrderStatus) error {
+	// For status changes that affect inventory (like cancellations), use Raft
+	// Otherwise, go directly to the underlying service
+	if st == domain.OrderStatusCancelled || st == domain.OrderStatusCompleted {
+		cmd := raft.OrderCommand{
+			Type:    "update_order_status",
+			OrderID: id,
+			AdditionalData: map[string]interface{}{
+				"status": string(st),
+			},
 		}
-		if len(s.ingredientResultMap) > 1000 {
-			s.ingredientResultMap = make(map[uint64]*domain.Ingredient)
-		}
-		s.resultMapLock.Unlock()
+
+		_, err := s.raftNode.Submit(cmd)
+		return err
 	}
+
+	return s.orderService.UpdateStatus(ctx, id, st)
 }
 
 // DeleteOrder deletes an order with Raft consensus
@@ -453,11 +383,6 @@ func (s *RaftService) DeleteOrder(ctx context.Context, id uint) error {
 	// No need to delete order with Raft, just use the underlying service
 	return s.orderService.DeleteOrder(ctx, id)
 
-}
-
-// CheckProductAvailability checks if a product is available
-func (s *RaftService) CheckProductAvailability(ctx context.Context, productID uint) (bool, error) {
-	return s.ingredientService.CheckProductAvailability(ctx, productID)
 }
 
 // CreateIngredient creates a new ingredient with Raft consensus
@@ -530,22 +455,32 @@ func (s *RaftService) DeleteIngredient(ctx context.Context, id int64) error {
 	return nil
 }
 
-// GetIngredientByID retrieves an ingredient by its ID
-func (s *RaftService) GetIngredientByID(ctx context.Context, id int64) (*domain.Ingredient, error) {
-	// This is a read operation, so we can delegate directly
-	return s.ingredientService.GetIngredientByID(ctx, id)
+// GetRaftNode returns the underlying Raft node
+func (s *RaftService) GetRaftNode() *raft.RaftNode {
+	return s.raftNode
 }
 
-// GetIngredientsByMerchant retrieves all ingredients for a merchant
-func (s *RaftService) GetIngredientsByMerchant(ctx context.Context, merchantID int64) ([]*domain.Ingredient, error) {
-	// This is a read operation, so we can delegate directly
-	return s.ingredientService.GetIngredientsByMerchant(ctx, merchantID)
+func (s *RaftService) updateLastApplied(index uint64) {
+	s.raftNode.UpdateLastApplied(index)
 }
 
-// GetInventorySummary retrieves inventory summary for a merchant
-func (s *RaftService) GetInventorySummary(ctx context.Context, merchantID int64) (map[string]interface{}, error) {
-	// This is a read operation, so we can delegate directly
-	return s.ingredientService.GetInventorySummary(ctx, merchantID)
+// CleanupResults cleans up the result map
+func (s *RaftService) cleanupResults() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		s.resultMapLock.Lock()
+		// Clean up based on time or maximum number
+		// Here we simplify the cleanup, in actual use, it should be more refined
+		if len(s.orderResultMap) > 1000 {
+			s.orderResultMap = make(map[uint64]*domain.Order)
+		}
+		if len(s.ingredientResultMap) > 1000 {
+			s.ingredientResultMap = make(map[uint64]*domain.Ingredient)
+		}
+		s.resultMapLock.Unlock()
+	}
 }
 
 // UpdateIngredient updates an ingredient with Raft consensus
@@ -575,6 +510,49 @@ func (s *RaftService) UpdateIngredient(ctx context.Context, ingredient *domain.I
 
 	// For updates, we don't need to wait for a result
 	return nil
+}
+
+// Other methods that the OrderService has, such as GetByID, UpdateStatus, etc.
+// These methods can go directly to the underlying OrderService since they don't
+// affect distributed state
+
+func (s *RaftService) GetByID(ctx context.Context, id uint) (*domain.Order, []domain.OrderItem, error) {
+	return s.orderService.GetByID(ctx, id)
+}
+
+func (s *RaftService) ListByCustomer(ctx context.Context, cid uint) ([]*domain.Order, error) {
+	return s.orderService.ListByCustomer(ctx, cid)
+}
+
+func (s *RaftService) ListByMerchant(ctx context.Context, mid uint) ([]*domain.Order, error) {
+	return s.orderService.ListByMerchant(ctx, mid)
+}
+
+func (s *RaftService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
+	return s.orderService.CheckProductsAvailability(ctx, productIDs)
+}
+
+// CheckProductAvailability checks if a product is available
+func (s *RaftService) CheckProductAvailability(ctx context.Context, productID uint) (bool, error) {
+	return s.ingredientService.CheckProductAvailability(ctx, productID)
+}
+
+// GetIngredientByID retrieves an ingredient by its ID
+func (s *RaftService) GetIngredientByID(ctx context.Context, id int64) (*domain.Ingredient, error) {
+	// This is a read operation, so we can delegate directly
+	return s.ingredientService.GetIngredientByID(ctx, id)
+}
+
+// GetIngredientsByMerchant retrieves all ingredients for a merchant
+func (s *RaftService) GetIngredientsByMerchant(ctx context.Context, merchantID int64) ([]*domain.Ingredient, error) {
+	// This is a read operation, so we can delegate directly
+	return s.ingredientService.GetIngredientsByMerchant(ctx, merchantID)
+}
+
+// GetInventorySummary retrieves inventory summary for a merchant
+func (s *RaftService) GetInventorySummary(ctx context.Context, merchantID int64) (map[string]interface{}, error) {
+	// This is a read operation, so we can delegate directly
+	return s.ingredientService.GetInventorySummary(ctx, merchantID)
 }
 
 func init() {

@@ -219,23 +219,6 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, 
 	return tx.Commit()
 }
 
-// func (s *OrderService) verifyInventory(
-// 	ctx context.Context,
-// 	merchantID uint,
-// 	items []SimpleItem,
-// ) error {
-// 	return nil
-// }
-
-// func (s *OrderService) updateInventory(
-// 	ctx context.Context,
-// 	merchantID uint,
-// 	items []SimpleItem,
-// 	orderID uint,
-// ) error {
-// 	return nil
-// }
-
 func (s *OrderService) CheckProductsAvailability(ctx context.Context, productIDs []uint) (map[uint]bool, error) {
 	return s.ingredientService.CheckProductsAvailability(ctx, productIDs)
 }
@@ -269,6 +252,5 @@ func (s *OrderService) DeleteOrder(ctx context.Context, id uint) error {
 		return err
 	}
 
-	// Commit the transaction
 	return tx.Commit()
 }

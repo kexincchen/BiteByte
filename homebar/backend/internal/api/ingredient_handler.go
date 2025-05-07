@@ -48,12 +48,6 @@ func (h *IngredientHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, merchantID) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
-
 	// Set merchant ID from path parameter
 	ingredient.MerchantID = merchantID
 
@@ -86,12 +80,6 @@ func (h *IngredientHandler) GetByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid merchant ID"})
 		return
 	}
-
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, merchantID) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
 
 	ingredient, err := h.service.GetIngredientByID(c.Request.Context(), ingredientID)
 	if err != nil {
@@ -128,12 +116,6 @@ func (h *IngredientHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid merchant ID"})
 		return
 	}
-
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, merchantID) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
 
 	// Get the existing ingredient
 	existingIngredient, err := h.service.GetIngredientByID(c.Request.Context(), ingredientID)
@@ -192,12 +174,6 @@ func (h *IngredientHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, merchantID) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
-
 	// Get the existing ingredient to verify ownership
 	existingIngredient, err := h.service.GetIngredientByID(c.Request.Context(), ingredientID)
 	fmt.Println("Existing ingredient: ", existingIngredient)
@@ -238,12 +214,6 @@ func (h *IngredientHandler) GetAll(c *gin.Context) {
 		return
 	}
 
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, merchantID) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
-
 	ingredients, err := h.service.GetIngredientsByMerchant(c.Request.Context(), merchantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving ingredients"})
@@ -262,12 +232,6 @@ func (h *IngredientHandler) GetInventorySummary(c *gin.Context) {
 		return
 	}
 
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, merchantID) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
-
 	summary, err := h.service.GetInventorySummary(c.Request.Context(), merchantID)
 	if err != nil {
 		fmt.Println("Error retrieving inventory summary: ", err)
@@ -280,26 +244,3 @@ func (h *IngredientHandler) GetInventorySummary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
-// Helper method to authorize merchant access
-// func (h *IngredientHandler) authorizeMerchant(c *gin.Context, merchantID int64) bool {
-// 	// Get the merchant from context
-// 	merchantRaw, exists := c.Get("merchant")
-// 	if !exists {
-// 		fmt.Println("Merchant not found in context")
-// 		return false
-// 	}
-
-// 	merchant, ok := merchantRaw.(*domain.Merchant)
-// 	if !ok || merchant == nil {
-// 		fmt.Println("Merchant is not a domain.Merchant")
-// 		return false
-// 	}
-
-// 	// Check if user is a merchant and matches the merchant ID
-// 	if merchant.ID != uint(merchantID) {
-// 		fmt.Println("Merchant does not match merchant ID")
-// 		return false
-// 	}
-
-// 	return true
-// }

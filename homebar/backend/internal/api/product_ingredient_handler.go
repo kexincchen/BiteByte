@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/service"
 )
 
@@ -62,8 +61,6 @@ func (h *ProductIngredientHandler) GetByProductID(c *gin.Context) {
 
 // GetByIngredientID gets all products that use a specific ingredient
 func (h *ProductIngredientHandler) GetByIngredientID(c *gin.Context) {
-	// This would require a different repo method that we haven't implemented yet
-	// For now, we'll return a not implemented response
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "Method not implemented"})
 }
 
@@ -145,8 +142,6 @@ func (h *ProductIngredientHandler) Create(c *gin.Context) {
 
 // GetByID gets a specific product-ingredient relationship
 func (h *ProductIngredientHandler) GetByID(c *gin.Context) {
-	// This would require a different model structure with a composite primary key
-	// For now, we'll return a not implemented response
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "Method not implemented"})
 }
 
@@ -185,12 +180,6 @@ func (h *ProductIngredientHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
-
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, int64(product.MerchantID)) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
 
 	// Update the ingredient quantity using the AddIngredientToProduct method
 	err = h.productIngredientService.AddIngredientToProduct(
@@ -235,12 +224,6 @@ func (h *ProductIngredientHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Authorize merchant access
-	// if !h.authorizeMerchant(c, int64(product.MerchantID)) {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-	// 	return
-	// }
-
 	// Remove the ingredient from the product
 	err = h.productIngredientService.RemoveIngredientFromProduct(c.Request.Context(), productID, ingredientID)
 	if err != nil {
@@ -249,25 +232,4 @@ func (h *ProductIngredientHandler) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
-}
-
-// Helper method to authorize merchant access
-func (h *ProductIngredientHandler) authorizeMerchant(c *gin.Context, merchantID int64) bool {
-	// Get the user from context
-	userRaw, exists := c.Get("user")
-	if !exists {
-		return false
-	}
-
-	user, ok := userRaw.(*domain.User)
-	if !ok || user == nil {
-		return false
-	}
-
-	// Check if user is a merchant and matches the merchant ID
-	if user.Role != "merchant" || user.MerchantID != merchantID {
-		return false
-	}
-
-	return true
 }

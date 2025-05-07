@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	// "log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	// "github.com/rs/zerolog/log"
 )
 
 // ClusterState represents the overall state of the Raft cluster

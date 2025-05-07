@@ -96,35 +96,6 @@ func (s *IngredientService) CheckProductsAvailability(ctx context.Context, produ
 	return s.ingredientRepo.CheckProductsAvailability(ctx, productIDs)
 }
 
-// ReserveInventoryForOrder creates inventory reservations for an order
-// This should be called within a transaction
-func (s *IngredientService) ReserveInventoryForOrder(ctx context.Context, tx *sql.Tx, orderID uint, orderItems []*domain.OrderItem) error {
-	// This function should:
-	// 1. Calculate ingredients needed for all products in the order
-	// 2. Lock the inventory rows (SELECT FOR UPDATE)
-	// 3. Verify sufficient inventory
-	// 4. Create reservation records
-	// 5. Update inventory quantities
-
-	// Get product IDs from order items
-	var productIDs []uint
-	for _, item := range orderItems {
-		productIDs = append(productIDs, item.ProductID)
-	}
-
-	// Implementation will depend on your existing repository structure
-	// This is intended to enhance your existing HasSufficientInventoryForOrder method
-
-	return nil
-}
-
-// CompleteOrderInventory marks inventory reservations as completed
-func (s *IngredientService) CompleteOrderInventory(ctx context.Context, tx *sql.Tx, orderID uint) error {
-	// Mark all reservations for this order as 'completed'
-	// No inventory quantity changes needed as they were already reduced during reservation
-	return nil
-}
-
 // CancelOrderInventory returns reserved inventory
 func (s *IngredientService) CancelOrderInventory(ctx context.Context, orderID uint) error {
 	return s.ingredientRepo.RestoreInventoryForOrder(ctx, orderID)

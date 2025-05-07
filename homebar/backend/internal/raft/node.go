@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
 	// "log"
 	"math/rand"
 	"os"
@@ -55,7 +56,6 @@ type RaftNode struct {
 
 // NewRaftNode creates a new Raft node with the given configuration
 func NewRaftNode(id string, peers []string, peerAddrs map[string]string, applyCh chan LogEntry, applyCommand func(cmd interface{}) error) *RaftNode {
-	// Create a zerolog instance with Raft-specific formatting
 	logger := log.With().
 		Str("component", "raft").
 		Str("node_id", id).
@@ -241,6 +241,12 @@ func (n *RaftNode) becomeLeader() {
 	for peerID := range n.peers {
 		n.nextIndex[peerID] = lastLogIndex + 1
 		n.matchIndex[peerID] = 0
+	}
+
+	// Stop the election timer - leaders don't need election timeouts
+	// as they should remain leaders until they detect a higher term
+	if n.electionTimer != nil {
+		n.electionTimer.Stop()
 	}
 
 	// Start sending heartbeats
@@ -455,18 +461,6 @@ func (n *RaftNode) applyCommittedEntries() {
 		if prevLastApplied != n.lastApplied {
 			n.persistState()
 		}
-
-		// n.lastApplied++
-
-		// // Apply the command to the state machine
-		// entry := n.log[n.lastApplied]
-		// n.applyCh <- entry
-
-		// if n.applyCommand != nil {
-		// 	if err := n.applyCommand(entry.Command); err != nil {
-		// 		n.logger.Info().Msgf("Error applying command: %v", err)
-		// 	}
-		// }
 	}
 }
 

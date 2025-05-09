@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	// "log"
 	"math/rand"
 	"os"
 	"sync"
@@ -670,19 +669,6 @@ func max(a, b uint64) uint64 {
 		return a
 	}
 	return b
-}
-
-// Add these methods to access unexported fields
-func (n *RaftNode) GetMutex() *sync.Mutex {
-	return &n.mu
-}
-
-func (n *RaftNode) GetLastApplied() uint64 {
-	return n.lastApplied
-}
-
-func (n *RaftNode) SetLastApplied(value uint64) {
-	n.lastApplied = value
 }
 
 // Add this method to update lastApplied

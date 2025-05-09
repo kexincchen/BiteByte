@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// import { useAuth } from '../../contexts/AuthContext';
 import { AuthContext } from "../../contexts/AuthContext";
 import { useContext } from "react";
 import { productAPI, ingredientAPI, productIngredientAPI } from '../../services/api';
@@ -9,7 +8,6 @@ import '../../styles/inventory.css';
 const ProductIngredients = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  // const { user } = useAuth();
   const { currentUser: user } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

@@ -76,8 +76,8 @@ func (h *UserHandler) Register(c *gin.Context) {
 			Description:  req.Description,
 			Address:      req.Address,
 			Phone:        req.Phone,
-			Username:     req.Username, // This seems redundant but matches the domain model
-			IsVerified:   false,        // Default to unverified
+			Username:     req.Username,
+			IsVerified:   false,
 		}
 		result, err = h.userService.RegisterMerchant(
 			c.Request.Context(),
@@ -116,9 +116,8 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would generate a JWT token here
 	c.JSON(http.StatusOK, gin.H{
 		"user":  userData,
-		"token": "sample-jwt-token", // This would be a real JWT token
+		"token": "sample-jwt-token",
 	})
 }

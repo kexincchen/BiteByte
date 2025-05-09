@@ -391,16 +391,6 @@ const OrderEditForm = ({ order, onSubmit, onCancel, onDelete }) => {
         ></textarea>
       </div>
 
-      {/* <div className="form-group">
-        <label>Delivery Date/Time:</label>
-        <input
-          type="datetime-local"
-          name="delivery_time"
-          value={formData.delivery_time || ""}
-          onChange={handleChange}
-        />
-      </div> */}
-
       <div className="form-actions">
         <button
           type="button"

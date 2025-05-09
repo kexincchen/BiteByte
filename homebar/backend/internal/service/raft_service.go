@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-    "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/kexincchen/homebar/internal/domain"
 	"github.com/kexincchen/homebar/internal/raft"
@@ -38,12 +38,12 @@ func NewRaftService(
 	peerAddrs map[string]string,
 ) (*RaftService, error) {
 	raftLogger := log.With().
-        Str("component", "raft").
-        Str("node_id", nodeID).
-        Logger()
+		Str("component", "raft").
+		Str("node_id", nodeID).
+		Logger()
 
 	// Initialize the Raft node
-    raftLogger.Info().Msg("Initializing Raft service")
+	raftLogger.Info().Msg("Initializing Raft service")
 
 	// Create the apply channel
 	applyCh := make(chan raft.LogEntry, raft.MaxLogEntriesBuffer)
@@ -130,10 +130,10 @@ func (s *RaftService) CreateOrder(
 		case <-ticker.C:
 			// Log performance metrics
 			log.Info().
-			Uint("customer_id", customerID).
-			Uint("merchant_id", merchantID).
-			Int("item_count", len(items)).
-			Msg("Order created successfully")
+				Uint("customer_id", customerID).
+				Uint("merchant_id", merchantID).
+				Int("item_count", len(items)).
+				Msg("Order created successfully")
 
 			// Check if the command has been applied
 			s.updateLastApplied(index)
@@ -512,10 +512,6 @@ func (s *RaftService) UpdateIngredient(ctx context.Context, ingredient *domain.I
 	return nil
 }
 
-// Other methods that the OrderService has, such as GetByID, UpdateStatus, etc.
-// These methods can go directly to the underlying OrderService since they don't
-// affect distributed state
-
 func (s *RaftService) GetByID(ctx context.Context, id uint) (*domain.Order, []domain.OrderItem, error) {
 	return s.orderService.GetByID(ctx, id)
 }
@@ -556,17 +552,17 @@ func (s *RaftService) GetInventorySummary(ctx context.Context, merchantID int64)
 }
 
 func init() {
-    // Pretty console logging for development
-    log.Logger = log.Output(zerolog.ConsoleWriter{
-        Out:        os.Stdout,
-        TimeFormat: time.RFC3339,
-        NoColor:    false,
-    })
-    
-    // Set global log level
-    zerolog.SetGlobalLevel(zerolog.InfoLevel)
-    
-    // Enable caller information
-    zerolog.CallerSkipFrameCount = 3
-    log.Logger = log.With().Logger()
+	// Pretty console logging for development
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
+		NoColor:    false,
+	})
+
+	// Set global log level
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+
+	// Enable caller information
+	zerolog.CallerSkipFrameCount = 3
+	log.Logger = log.With().Logger()
 }

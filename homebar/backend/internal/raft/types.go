@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"sync"
 	"time"
 )
 
@@ -25,10 +24,6 @@ const (
 	HeartbeatInterval   = 50 * time.Millisecond
 	RPCTimeout          = 100 * time.Millisecond
 	MaxAppendEntries    = 100 // Maximum number of entries to send in a single AppendEntries RPC
-	SnapshotChunkSize   = 1024 * 64
-	StateCheckInterval  = 20 * time.Millisecond
-	PersistInterval     = 1 * time.Second
-	LogCompactionFreq   = 60 * time.Second
 	MaxLogEntriesBuffer = 1000
 )
 
@@ -51,9 +46,9 @@ type OrderCommand struct {
 
 // OrderItemCommand represents an item in an order command
 type OrderItemCommand struct {
-    ProductID uint    `json:"product_id"`
-    Quantity  int     `json:"quantity"`
-    Price     float64 `json:"price"`
+	ProductID uint    `json:"product_id"`
+	Quantity  int     `json:"quantity"`
+	Price     float64 `json:"price"`
 }
 
 // RequestVoteArgs represents the arguments for a RequestVote RPC

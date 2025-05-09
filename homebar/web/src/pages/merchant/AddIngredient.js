@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { useAuth } from '../../contexts/AuthContext';
 import { AuthContext } from "../../contexts/AuthContext";
 import { useContext } from "react";
 import { ingredientAPI } from '../../services/api';
 import '../../styles/inventory.css';
 
 const AddIngredient = () => {
-  // const { user } = useAuth();
   const { currentUser: user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [error, setError] = useState(null);

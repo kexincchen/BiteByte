@@ -25,8 +25,7 @@ const Cart = () => {
       // Format the order data
       const orderData = {
         customer_id: parseInt(currentUser.id), // Ensure it's a number
-        // merchant_id:cartItems[0].merchant_id, // Assuming all items are from the same
-        merchant_id: 1, // Use a default merchant_id for demo purposes
+        merchant_id:cartItems[0].merchant_id, // Assuming all items are from the same
         items: cartItems.map((item) => ({
           product_id: parseInt(item.id), // Ensure it's a number
           quantity: item.quantity,

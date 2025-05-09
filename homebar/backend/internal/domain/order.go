@@ -12,22 +12,6 @@ const (
 	OrderStatusCancelled OrderStatus = "cancelled"
 )
 
-// IsValidTransition checks if a status transition is allowed
-func IsValidTransition(from, to OrderStatus) bool {
-	// Only pending orders can transition to completed or cancelled
-	if from == OrderStatusPending && (to == OrderStatusCompleted || to == OrderStatusCancelled) {
-		return true
-	}
-
-	// Allow setting the same status (no change)
-	if from == to {
-		return true
-	}
-
-	// All other transitions are invalid
-	return false
-}
-
 type Order struct {
 	ID           uint        `json:"id"`
 	CustomerID   uint        `json:"customer_id"`

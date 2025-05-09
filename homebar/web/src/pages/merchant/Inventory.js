@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-// import { useAuth } from "../../contexts/AuthContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import { useContext } from "react";
 import { ingredientAPI } from "../../services/api";
 import "../../styles/inventory.css";
 
 const Inventory = () => {
-  // const { user } = useAuth();
   const { currentUser: user } = useContext(AuthContext);
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);

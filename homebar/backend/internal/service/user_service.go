@@ -16,7 +16,7 @@ type UserService struct {
 	userRepo     repository.UserRepository
 	customerRepo repository.CustomerRepository
 	merchantRepo repository.MerchantRepository
-	db           *sql.DB // For transactions
+	db           *sql.DB
 }
 
 func NewUserService(

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-// import { useAuth } from '../../contexts/AuthContext';
 import { AuthContext } from "../../contexts/AuthContext";
 import { useContext } from "react";
 import { ingredientAPI } from '../../services/api';
@@ -8,7 +7,6 @@ import '../../styles/inventory.css';
 
 const EditIngredient = () => {
   const { id } = useParams();
-  // const { user } = useAuth();
   const { currentUser: user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);

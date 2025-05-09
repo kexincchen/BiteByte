@@ -3,6 +3,7 @@ package raft
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -203,9 +204,9 @@ func (c *ClusterCoordinator) checkNodesHealth() {
 		if id == c.selfID {
 			continue
 		}
-		url := strings.TrimRight(st.Address, "/") + "/health"
+		healthUrl := strings.TrimRight(st.Address, "/") + "/health"
 
-		ok := probe(url)
+		ok := probe(healthUrl)
 		c.mu.Lock()
 		cur := c.state.Nodes[id]
 		cur.IsHealthy = ok
@@ -270,7 +271,7 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 
 	mux.HandleFunc("/cluster/logs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Get the limit parameter if provided
 		limitStr := r.URL.Query().Get("limit")
 		limit := 10 // Default limit
@@ -279,10 +280,10 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 				limit = l
 			}
 		}
-		
+
 		// Get the node ID from the request if provided
 		nodeID := r.URL.Query().Get("node")
-		
+
 		// Get the log entries
 		var logEntries []LogEntry
 		if nodeID != "" && c.nodes[nodeID] != nil {
@@ -313,14 +314,14 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 				node.mu.Unlock()
 			}
 		}
-		
+
 		// Create a simplified response
 		type LogEntryResponse struct {
-			Index   uint64 `json:"index"`
-			Term    uint64 `json:"term"`
-			Type    string `json:"type,omitempty"`
+			Index uint64 `json:"index"`
+			Term  uint64 `json:"term"`
+			Type  string `json:"type,omitempty"`
 		}
-		
+
 		response := make([]LogEntryResponse, 0, len(logEntries))
 		for _, entry := range logEntries {
 			// Try to determine command type
@@ -328,14 +329,14 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 			if cmd, ok := entry.Command.(OrderCommand); ok {
 				cmdType = cmd.Type
 			}
-			
+
 			response = append(response, LogEntryResponse{
 				Index: entry.Index,
 				Term:  entry.Term,
 				Type:  cmdType,
 			})
 		}
-		
+
 		// Return the entries
 		json.NewEncoder(w).Encode(response)
 	})
@@ -350,7 +351,7 @@ func (c *ClusterCoordinator) startHTTPServer(nodeID string) {
 	}
 
 	go func() {
-		if err := c.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := c.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			c.logger.Error().Err(err).Msg("HTTP server error")
 		}
 	}()

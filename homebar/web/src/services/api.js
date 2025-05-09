@@ -134,23 +134,6 @@ export const orderAPI = {
   },
 };
 
-// User/Profile API
-export const userAPI = {
-  getProfile: () => {
-    return apiClient.get("/users/me");
-  },
-  updateProfile: (userData) => {
-    return apiClient.put("/users/me", userData);
-  },
-};
-
-// Cart API (if needed on server side)
-export const cartAPI = {
-  checkout: (cartData) => {
-    return apiClient.post("/cart/checkout", cartData);
-  },
-};
-
 // Add a dedicated Merchant API object if needed
 export const merchantAPI = {
   getMerchants: () => {

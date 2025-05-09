@@ -6,13 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
-
-	// "log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-
 	"os/signal"
 	"syscall"
 
@@ -24,12 +21,10 @@ import (
 	"github.com/kexincchen/homebar/internal/api"
 	"github.com/kexincchen/homebar/internal/config"
 	"github.com/kexincchen/homebar/internal/db"
-	// "github.com/kexincchen/homebar/internal/logging"
 	"github.com/kexincchen/homebar/internal/raft"
 	"github.com/kexincchen/homebar/internal/repository"
 	"github.com/kexincchen/homebar/internal/repository/postgres"
 	"github.com/kexincchen/homebar/internal/service"
-	//"time"
 )
 
 var (
@@ -64,38 +59,19 @@ func main() {
 	}
 
 	var peerIDs []string
-
-	if ids := os.Getenv("RAFT_PEER_IDS"); ids != "" {
-		for _, id := range strings.Split(ids, ",") {
-			id = strings.TrimSpace(id)
-			if id != "" {
-				peerIDs = append(peerIDs, id)
-			}
-		}
-	}
-
-	if len(peerIDs) == 0 {
-		if env := os.Getenv("RAFT_PEERS"); env != "" {
-			for _, kv := range strings.Split(env, ",") {
-				if p := strings.SplitN(kv, "=", 2); len(p) == 2 {
-					peerIDs = append(peerIDs, strings.TrimSpace(p[0]))
-				}
+	peerMap := map[string]string{}
+	if env := os.Getenv("RAFT_PEERS"); env != "" {
+		for _, kv := range strings.Split(env, ",") {
+			p := strings.SplitN(kv, "=", 2)
+			if len(p) == 2 {
+				peerIDs = append(peerIDs, strings.TrimSpace(p[0]))
+				peerMap[p[0]] = p[1]
 			}
 		}
 	}
 
 	if len(peerIDs) == 0 {
 		peerIDs = []string{nodeID}
-	}
-
-	peerMap := map[string]string{}
-	if env := os.Getenv("RAFT_PEERS"); env != "" {
-		for _, kv := range strings.Split(env, ",") {
-			p := strings.SplitN(kv, "=", 2)
-			if len(p) == 2 {
-				peerMap[p[0]] = p[1]
-			}
-		}
 	}
 
 	// Initialize repositories
@@ -139,9 +115,7 @@ func main() {
 	// Initialize handlers
 	userHandler := api.NewUserHandler(userService)
 	productHandler := api.NewProductHandler(productService, ingredientService)
-	// orderHandler := api.NewOrderHandler(orderService, productService)
 	merchantHandler := api.NewMerchantHandler(merchantService)
-	// ingredientHandler := api.NewIngredientHandler(ingredientService)
 	productIngredientHandler := api.NewProductIngredientHandler(
 		productIngredientService,
 		productService,
@@ -485,38 +459,5 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		c.Set("logger", logger)
 
 		c.Next()
-	}
-}
-
-func configureLogging() {
-	// Default to info level
-	logLevelStr := os.Getenv("LOG_LEVEL")
-	if logLevelStr == "" {
-		logLevelStr = "info"
-	}
-
-	var level zerolog.Level
-	switch strings.ToLower(logLevelStr) {
-	case "debug":
-		level = zerolog.DebugLevel
-	case "info":
-		level = zerolog.InfoLevel
-	case "warn", "warning":
-		level = zerolog.WarnLevel
-	case "error":
-		level = zerolog.ErrorLevel
-	default:
-		level = zerolog.InfoLevel
-	}
-
-	zerolog.SetGlobalLevel(level)
-
-	// Use pretty logging for development
-	if os.Getenv("ENVIRONMENT") != "production" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-			NoColor:    false,
-		})
 	}
 }

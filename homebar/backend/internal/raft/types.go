@@ -87,23 +87,3 @@ type AppendEntriesReply struct {
 	ConflictTerm  uint64 // Term of the conflicting entry
 	ConflictIndex uint64 // First index of the conflicting term
 }
-
-// Node represents the persistent state of a Raft node
-type RaftNodeState struct {
-	mu              sync.Mutex      // Protects concurrent access to node state
-	currentTerm     uint64          // Latest term server has seen
-	votedFor        string          // CandidateID that received vote in current term (or "" if none)
-	log             []LogEntry      // Log entries
-	commitIndex     uint64          // Index of highest log entry known to be committed
-	lastApplied     uint64          // Index of highest log entry applied to state machine
-	state           NodeState       // Current state (follower, candidate, leader)
-	id              string          // This node's ID
-	peerNodes       []string        // IDs of all peer nodes
-	electionTimeout time.Duration   // Randomized election timeout
-	lastHeartbeat   time.Time       // Time of last received heartbeat
-	votes           map[string]bool // Votes received (only relevant for candidate)
-
-	// Leader-specific state
-	nextIndex  map[string]uint64 // For each server, index of the next log entry to send to that server
-	matchIndex map[string]uint64 // For each server, index of highest log entry known to be replicated
-}

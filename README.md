@@ -27,17 +27,6 @@ The BiteByte project implements a distributed home bar ordering system using the
 - Automatic ingredient stock verification during ordering
 - Low inventory alert notifications
 
-## Technical Architecture
-
-### Structure 
-
-The project adopts a layered architecture, primarily divided into: Client Layer, API Layer, Service Layer, and Core Layer.
-
-- **Client Layer**: Web interface, mobile applications
-- **API Layer**: API gateway, authentication middleware
-- **Service Layer**: User service, merchant service, product service, order service, payment service, notification service, review service, inventory management service
-- **Core Layer**: Domain models, repository interfaces
-
 ### Order Inventory Verification Process
 
 When a customer places an order, the system will:
@@ -45,6 +34,17 @@ When a customer places an order, the system will:
 2. Verify if the inventory for each ingredient is sufficient
 3. If all ingredient inventory is sufficient, reserve the inventory and notify the merchant for fulfillment
 4. If some ingredients are low in stock, send a low inventory warning to the merchant 
+
+## Technical Architecture
+
+### Structure 
+
+The project is structured around a layered architecture that separates different concerns:
+- **API Layer**: HTTP handlers that process incoming requests (in `internal/api`)
+- **Service Layer**: Business logic implementation (in `internal/service`)
+- **Repository Layer**: Data access layer for database interactions (in `internal/repository`)
+- **Domain Layer**: Core domain models and entities (in `internal/domain`)
+- **Raft Layer**: Consensus algorithm implementation (in `internal/raft`)
 
 ### Technology Stack
 
@@ -79,18 +79,6 @@ homebar/
 ├── README.md               # Project overview
 └── .gitignore              # Git ignore rules
 ```
-
-## Domain Models
-
-The system includes the following main domain models:
-
-- **User**: Basic user information
-- **Customer**: Customer-specific information
-- **Merchant**: Merchant-specific information
-- **Product**: Product information
-- **Ingredient**: Ingredient information
-- **ProductIngredient**: Product and ingredient association
-- **Order**: Order information
 
 ## Project Setup
 

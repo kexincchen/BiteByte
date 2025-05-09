@@ -65,7 +65,7 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	// 获取每个订单项对应的产品信息
+	// Get each order item's product information
 	itemsWithProducts := make([]map[string]interface{}, 0)
 	for _, item := range items {
 		product, err := h.productService.GetByID(c, item.ProductID)
@@ -110,29 +110,6 @@ func (h *OrderHandler) List(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "missing filter"})
 }
 
-// func (s *OrderService) UpdateOrder(ctx context.Context, id uint, status string, notes string, deliveryAddr string, deliveryTime string) error {
-// 	// Get the existing order
-// 	order, _, err := s.orderRepo.GetByID(ctx, id)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// Update fields that are provided
-// 	if status != "" {
-// 		order.Status = domain.OrderStatus(status)
-// 	}
-
-// 	if notes != "" {
-// 		order.Notes = notes
-// 	}
-
-// 	if deliveryAddr != "" {
-// 		order.DeliveryAddr = deliveryAddr
-// 	}
-
-// 	// Update the order in the database
-// 	return s.orderRepo.UpdateOrder(ctx, order, deliveryTime)
-// }
 
 // UpdateStatus PUT /api/orders/:id/status
 func (h *OrderHandler) UpdateStatus(c *gin.Context) {
@@ -272,12 +249,6 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
 		return
 	}
-
-	// Check the order status
-	// if order.Status == domain.OrderStatusPending {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete a pending order; cancel it first"})
-	// 	return
-	// }
 
 	// Delete the order
 	if err := h.orderService.DeleteOrder(c, uint(id)); err != nil {

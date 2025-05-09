@@ -1,6 +1,8 @@
 
 # Home Bar Ordering Distributed Project - BiteByte
 
+**Authors**： Kexin Chen 1240143, Yitong Kong 1254947
+
 ## Project Overview
 
 The BiteByte project implements a distributed home bar ordering system using the **Raft consensus algorithm** to ensure data consistency across multiple nodes. The system follows a clean, layered architecture that separates concerns and promotes maintainability.

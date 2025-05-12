@@ -146,3 +146,26 @@ To run the monitoring script:
 ```
 ./scripts/monitor_raft.sh
 ```
+
+```bash
+cd Desktop/demo/homebar/backend
+source .env
+```
+
+```bash
+NODE_ID=1 PORT=9001 go run cmd/server/main.go
+```
+
+```bash
+NODE_ID=2 PORT=9002 go run cmd/server/main.go
+```
+
+```bash
+NODE_ID=3 PORT=9003 go run cmd/server/main.go
+```
+
+```bash
+curl http://127.0.0.1:8091/cluster/status
+curl http://127.0.0.1:8092/cluster/status
+curl http://127.0.0.1:8093/cluster/status
+```
